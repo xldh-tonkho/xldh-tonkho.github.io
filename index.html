@@ -116,6 +116,7 @@ table.sap td.av{font-weight:700}
     <button data-tab="stock" class="on">Tồn khả dụng</button>
     <button data-tab="orders">Đơn đang giữ <span class="cnt" id="cntOrders">0</span></button>
     <button data-tab="history">Lịch sử</button>
+    <button data-tab="imp">Nhập đơn chừa</button>
     <button data-tab="guide">Hướng dẫn</button>
   </nav>
 </header>
@@ -166,6 +167,29 @@ table.sap td.av{font-weight:700}
     <div class="tw" id="historyTable"><div class="empty">Đang tải…</div></div>
   </section>
 
+  <!-- TAB: IMPORT ĐƠN CHỪA -->
+  <section id="tab-imp" class="hide">
+    <div class="card">
+      <h2>Nhập file đơn chừa → tự giữ hàng</h2>
+      <div class="small muted" style="margin-bottom:10px">Chọn file Excel / CSV (ví dụ xuất từ VA05) hoặc dán bảng từ Excel (có dòng tiêu đề). Cần tối thiểu cột <b>Mã hàng</b>, <b>Số lượng</b>; nên có <b>Kho (Plant)</b>, <b>Số đơn SAP</b>, <b>Khách/CH</b>, <b>Lô</b>. Dòng đã có trong app (trùng số đơn SAP + mã + lô) sẽ tự bỏ qua, nên nhập lại file mỗi ngày không bị trừ 2 lần.</div>
+      <div class="row" style="margin-bottom:8px"><input type="file" id="impFile" accept=".xlsx,.xls,.csv,.txt"><span class="small muted">hoặc dán:</span></div>
+      <textarea id="impPaste" placeholder="Sales Document	Sold-to party	Material	Plant	Batch	Order Quantity"></textarea>
+      <div class="row" style="margin-top:8px"><button class="btn pri" id="impRead">Đọc dữ liệu</button><span class="small muted" id="impReadMsg"></span></div>
+    </div>
+    <div class="card hide" id="impMapCard">
+      <h2>Kiểm tra trước khi giữ hàng</h2>
+      <div class="map" id="impMap"></div>
+      <div class="row" style="margin-top:10px">
+        <label class="fld" style="margin:0"><span>Kho mặc định (khi file không có cột kho)</span><select id="impPlant"></select></label>
+        <label class="fld" style="margin:0"><span>KD mặc định</span><input type="text" id="impKD" list="dlKD"></label>
+        <label class="fld" style="margin:0"><span>Ghi chú</span><input type="text" id="impNote" value="Nhập file đơn chừa"></label>
+      </div>
+      <div id="impSum" style="margin-top:10px"></div>
+      <div class="tw" id="impPrev" style="max-height:420px;margin-top:8px"></div>
+      <div class="row" style="margin-top:12px"><button class="btn ok" id="impGo">Giữ hàng các dòng đã chọn</button><span class="small muted">Dòng không có lô sẽ tự chia vào các lô còn khả dụng (lô cũ trước).</span></div>
+    </div>
+  </section>
+
   <!-- TAB: GUIDE -->
   <section id="tab-guide" class="hide">
     <div class="card guide">
@@ -181,6 +205,12 @@ table.sap td.av{font-weight:700}
         <li>Tab <b>Tồn khả dụng</b> → gõ mã / tên / lô, chọn kho → bấm vào dòng lô cần lấy.</li>
         <li>Nhập số lượng → <b>Thêm vào đơn</b>. Đơn nhiều mã thì bấm tiếp các dòng khác.</li>
         <li>Bấm <b>Xem &amp; lưu đơn</b> → nhập <b>CH / khách đặt</b>, KD, số đơn SAP (nếu có) → <b>Lưu giữ hàng</b>. Khả dụng trừ ngay, người khác thấy trong vòng ~20 giây.</li>
+      </ol>
+      <h3>Nhập file đơn chừa (giữ hàng hàng loạt)</h3>
+      <ol>
+        <li>Tab <b>Nhập đơn chừa</b> → chọn file Excel / CSV (ví dụ xuất VA05) hoặc dán bảng → <b>Đọc dữ liệu</b>.</li>
+        <li>Kiểm tra cột app tự nhận (sai thì chọn lại), chọn kho / KD mặc định nếu file thiếu.</li>
+        <li>Xem bảng trạng thái: <b>OK</b>, <b>Vượt</b> (vượt khả dụng), <b>Đã có</b> (đã giữ trước đó – tự bỏ qua), <b>Lỗi</b> (không thấy mã/lô trong tồn). Bỏ tick dòng không muốn giữ → <b>Giữ hàng</b>.</li>
       </ol>
       <h3>Khi hàng đã xuất / khách hủy · Đóng đơn</h3>
       <ol>
@@ -525,7 +555,7 @@ function renderGlobal(){
 }
 function switchTab(t){S.tab=t;document.querySelectorAll('#nav button').forEach(b=>b.classList.toggle('on',b.dataset.tab===t));
   document.querySelectorAll('main>section').forEach(s=>s.classList.toggle('hide',s.id!=='tab-'+t));
-  if(t==='stock')renderStock();if(t==='orders')renderOrders();if(t==='history')loadHistory();
+  if(t==='stock')renderStock();if(t==='orders')renderOrders();if(t==='history')loadHistory();if(t==='imp')impInit();
   try{localStorage.setItem('tk_tab',t)}catch(e){}}
 function renderAll(){renderSnap();renderGlobal();if(S.tab==='stock')renderStock();if(S.tab==='orders')renderOrders();if(S.tab==='stock'||S.tab==='orders')renderStats()}
 
@@ -558,6 +588,81 @@ $('#copyOrders').onclick=()=>{const terms=norm($('#oq').value).split(/\s+/).filt
 let hT=null;$('#hq').addEventListener('input',()=>{clearTimeout(hT);hT=setTimeout(renderHistory,150)});
 $('#hReload').onclick=loadHistory;
 document.addEventListener('keydown',e=>{if(e.key==='Escape'){const ovs=document.querySelectorAll('#modalRoot .ov');if(ovs.length)ovs[ovs.length-1].remove()}});
+
+/* ---------- nhập file đơn chừa ---------- */
+const IMP={mat:null,hdr:0,cols:{},rows:[],plan:[]};
+const IMPF=[['so','Số đơn SAP'],['ch','Khách / CH'],['kd','KD'],['m','Mã hàng *'],['p','Kho (Plant)'],['s','Kho con (SLoc)'],['x','Màu'],['b','Lô (Batch)'],['q','Số lượng *'],['u','ĐVT']];
+let xlsxP=null;
+function loadXlsx(){if(window.XLSX)return Promise.resolve();if(xlsxP)return xlsxP;
+  xlsxP=new Promise((res,rej)=>{const sc=document.createElement('script');sc.src='https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js';sc.onload=()=>res();sc.onerror=()=>{xlsxP=null;rej(new Error('Không tải được bộ đọc Excel'))};document.head.appendChild(sc)});return xlsxP}
+function impInit(){const sel=$('#impPlant');const v=sel.value;sel.innerHTML='<option value="">— chọn —</option>'+S.plants.map(p=>'<option value="'+esc(p)+'"'+(p===v?' selected':'')+'>'+esc(p)+(S.pName&&S.pName[p]?' – '+esc(S.pName[p]):'')+'</option>').join('');
+  if(!S.canWrite){$('#impGo').disabled=true}}
+function impSplit(txt){const lines=txt.replace(/\r/g,'').split('\n').filter(l=>l.trim());const tab=lines.some(l=>l.includes('\t'));
+  return lines.map(l=>tab?l.split('\t').map(x=>x.trim()):l.split(/[;,]/).map(x=>x.replace(/^"|"$/g,'').trim()))}
+function impDetect(h){const H=h.map(x=>norm(x).replace(/[^a-z0-9 ]/g,' ').replace(/\s+/g,' ').trim());const used=new Set();
+  const pick=ts=>{for(const t of ts)for(let i=0;i<H.length;i++){if(used.has(i)||!H[i])continue;if(t(H[i])){used.add(i);return i}}return -1};const c={};
+  c.q=pick([x=>/chua giao|con lai|open|chua xuat|so luong chua/.test(x),x=>/^(so luong|sl|qty|quantity)$/.test(x),x=>/order quantity|confirmed|so luong|quantity|^sl /.test(x)]);
+  c.so=pick([x=>/^(so don|so don sap|so don hang|so so|sales document|sales doc|so chung tu|don hang|vbeln|so ct)$/.test(x),x=>/sales doc|so don|chung tu|document/.test(x)]);
+  c.m=pick([x=>/^(material|mat|ma hang|ma vat tu|ma vt|ma sp|material number|ma)$/.test(x),x=>/^material/.test(x)&&!/desc|group/.test(x)]);
+  c.ch=pick([x=>/^(name 1|name|ten khach|ten khach hang|khach hang|khach|cua hang|ch|ten ch|customer name|ten kh)$/.test(x),x=>/name|ten khach|cua hang|customer/.test(x),x=>/sold to|ship to|khach/.test(x)]);
+  c.kd=pick([x=>/^(kd|nvkd|ten kd|nhan vien kd|nhan vien|sales rep|sales employee)$/.test(x)]);
+  c.p=pick([x=>/^(plant|plnt|kho|ma kho|nha may|werks)$/.test(x)]);
+  c.s=pick([x=>/storage loc|stor loc|^sloc$|kho con/.test(x)]);
+  c.x=pick([x=>/^(mau|m)$/.test(x)]);
+  c.b=pick([x=>/^(batch|lo|so lo|lo hang)$/.test(x)]);
+  c.u=pick([x=>/^(su|sales unit|dvt|don vi|un|bun|uom)$/.test(x)]);
+  return c}
+function impNum(v){if(typeof v==='number')return v;let s=String(v||'').replace(/\s/g,'');if(!s)return NaN;if(s.includes(',')&&!s.includes('.'))s=/^\d{1,3}(,\d{3})+$/.test(s)?s.replace(/,/g,''):s.replace(',','.');else if(s.includes(',')&&s.includes('.'))s=s.lastIndexOf(',')>s.lastIndexOf('.')?s.replace(/\./g,'').replace(',','.'):s.replace(/,/g,'');else if(/^\d{1,3}(\.\d{3})+$/.test(s))s=s.replace(/\./g,'');return parseFloat(s)}
+function impLoad(mat){mat=mat.map(r=>(r||[]).map(v=>v==null?'':v));let hi=0,c=null;
+  for(let i=0;i<Math.min(mat.length,25);i++){const d=impDetect(mat[i]);if(d.m>=0&&d.q>=0){hi=i;c=d;break}}
+  if(!c){hi=0;c=impDetect(mat[0]||[]);toast('Không tự nhận được cột Mã hàng / Số lượng – chọn tay bên dưới',true)}
+  IMP.mat=mat;IMP.hdr=hi;IMP.cols=c;$('#impMapCard').classList.remove('hide');impInit();impRender()}
+function impBuild(){const c=IMP.cols,mat=IMP.mat,dp=$('#impPlant').value,dkd=clean($('#impKD').value);const g=(r,k)=>c[k]>=0?clean(r[c[k]]):'';
+  const rows=[];for(let i=IMP.hdr+1;i<mat.length;i++){const r=mat[i];const m=g(r,'m');if(!m)continue;if(/^(tong|total)/.test(norm(m)))continue;
+    const q=impNum(c.q>=0?r[c.q]:'');if(!(q>0))continue;rows.push({so:g(r,'so'),ch:g(r,'ch'),kd:g(r,'kd')||dkd,m,p:g(r,'p')||dp,s:g(r,'s'),x:g(r,'x'),b:g(r,'b'),q:r3(q),u:g(r,'u')})}
+  // existing holds -> duplicate detection
+  const ex=new Set(S.orders.map(o=>[normSo(o.so),o.m,o.b].join('|')));const exNoB=new Set(S.orders.map(o=>[normSo(o.so),o.m].join('|')));
+  const used=new Map();const plan=[];
+  for(const r of rows){const it={r,lines:[],st:'ok',msg:'',on:true};plan.push(it);
+    if(!r.p){it.st='bad';it.msg='Thiếu kho – chọn Kho mặc định';it.on=false;continue}
+    if(r.so&&(r.b?ex.has([normSo(r.so),r.m,r.b].join('|')):exNoB.has([normSo(r.so),r.m].join('|')))){it.st='dup';it.msg='Đã có trong app – bỏ qua';it.on=false;continue}
+    let cand=S.stock.filter(x=>x.m===r.m&&x.p===r.p&&(!r.b||x.b===r.b)&&(!r.s||x.s===r.s)&&(!r.x||x.x===r.x));
+    if(!cand.length){it.st='bad';it.msg=r.b?'Không thấy lô này trong tồn':'Không thấy mã ở kho này';it.on=false;continue}
+    const av=x=>r3(availOf(x.k)-(used.get(x.k)||0));
+    if(r.b){const x=cand.sort((a,b)=>av(b)-av(a))[0];it.lines.push({x,qty:r.q});used.set(x.k,(used.get(x.k)||0)+r.q);if(av(x)<-0.0005){it.st='warn';it.msg='Vượt khả dụng '+fmtN(-av(x))}}
+    else{cand.sort((a,b)=>String(a.b).localeCompare(String(b.b),'vi',{numeric:true}));let need=r.q;
+      for(const x of cand){if(need<=0.0005)break;const a=av(x);if(a<=0.0005)continue;const t=r3(Math.min(a,need));it.lines.push({x,qty:t});used.set(x.k,(used.get(x.k)||0)+t);need=r3(need-t)}
+      if(need>0.0005){const x=it.lines.length?it.lines[it.lines.length-1].x:cand[0];const l=it.lines.find(l=>l.x===x);if(l)l.qty=r3(l.qty+need);else it.lines.push({x,qty:need});used.set(x.k,(used.get(x.k)||0)+need);it.st='warn';it.msg='Vượt khả dụng '+fmtN(need)}
+      if(it.lines.length>1&&it.st==='ok')it.msg='Chia '+it.lines.length+' lô'}}
+  IMP.plan=plan}
+function impRender(){const hdr=IMP.mat[IMP.hdr]||[];const opts=sel=>'<option value="-1">— không có —</option>'+hdr.map((h,i)=>'<option value="'+i+'"'+(i===sel?' selected':'')+'>'+esc(h||('Cột '+(i+1)))+'</option>').join('');
+  $('#impMap').innerHTML=IMPF.map(([k,l])=>'<label class="fld" style="margin:0"><span>'+l+'</span><select data-ic="'+k+'">'+opts(IMP.cols[k])+'</select></label>').join('');
+  $('#impMap').querySelectorAll('select').forEach(sl=>sl.onchange=()=>{IMP.cols[sl.dataset.ic]=+sl.value;impRender()});
+  impBuild();const P=IMP.plan;const cnt=k=>P.filter(x=>x.st===k).length;const on=P.filter(x=>x.on);
+  $('#impSum').innerHTML='<div class="banner info">Đọc được <b>'+P.length+'</b> dòng: <b>'+cnt('ok')+'</b> hợp lệ, <b>'+cnt('warn')+'</b> vượt khả dụng, <b>'+cnt('dup')+'</b> đã có trong app (bỏ qua), <b>'+cnt('bad')+'</b> không khớp tồn. Sẽ giữ hàng <b>'+on.length+'</b> dòng ('+new Set(on.map(x=>x.r.so||x.r.ch||'?')).size+' đơn).</div>';
+  const pill={ok:'<span class="pill ok">OK</span>',warn:'<span class="pill warn">Vượt</span>',dup:'<span class="pill info">Đã có</span>',bad:'<span class="pill bad">Lỗi</span>'};
+  $('#impPrev').innerHTML='<table><thead><tr><th></th><th>Trạng thái</th><th>Số SAP</th><th>Khách / CH</th><th>KD</th><th>Mã</th><th>Kho</th><th>Lô sẽ giữ</th><th class="n">SL</th><th>Ghi chú</th></tr></thead><tbody>'+
+    P.map((it,i)=>'<tr><td><input type="checkbox" data-ii="'+i+'"'+(it.on?' checked':'')+(it.st==='bad'?' disabled':'')+'></td><td>'+pill[it.st]+'</td><td>'+esc(it.r.so)+'</td><td>'+esc(it.r.ch)+'</td><td>'+esc(it.r.kd)+'</td><td><b>'+esc(it.r.m)+'</b></td><td>'+esc(it.r.p)+'</td><td>'+(it.lines.map(l=>esc(l.x.b)+(l.x.x?' ('+esc(l.x.x)+')':'')+(it.lines.length>1?': '+fmtN(l.qty):'')).join('<br>')||esc(it.r.b))+'</td><td class="n">'+fmtN(it.r.q)+'</td><td class="small">'+esc(it.msg)+'</td></tr>').join('')+'</tbody></table>';
+  $('#impPrev').querySelectorAll('[data-ii]').forEach(cb=>cb.onchange=()=>{IMP.plan[+cb.dataset.ii].on=cb.checked;const on=IMP.plan.filter(x=>x.on);$('#impGo').textContent='Giữ hàng '+on.length+' dòng đã chọn'});
+  $('#impGo').textContent='Giữ hàng '+on.length+' dòng đã chọn';$('#impGo').disabled=!on.length||S.canWrite===false}
+async function impGo(){const on=IMP.plan.filter(x=>x.on&&x.lines.length);if(!on.length)return;
+  const groups=new Map();const note=clean($('#impNote').value);
+  for(const it of on){const r=it.r;const key=(r.so||'')+'|'+(r.ch||'')+'|'+(r.kd||'');if(!groups.has(key))groups.set(key,{ch:r.ch||(r.so?'Đơn '+r.so:'Đơn chừa'),kd:r.kd,so:r.so,note,lines:[]});
+    const g=groups.get(key);for(const l of it.lines){const x=l.x;g.lines.push({m:x.m,d:x.d,p:x.p,n:x.n,s:x.s,x:x.x,g:x.g,b:x.b,u:x.u||r.u,qty:l.qty})}}
+  const orders=[...groups.values()];
+  if(!await confirmBox('Giữ hàng từ file','Tạo <b>'+orders.length+'</b> đơn giữ hàng, <b>'+orders.reduce((a,o)=>a+o.lines.length,0)+'</b> dòng. Khả dụng sẽ bị trừ ngay cho cả nhóm.','Giữ hàng'))return;
+  const b=$('#impGo');b.disabled=true;b.textContent='Đang lưu…';
+  try{const res=await api('importOrders',orders);await refreshState();toast('Đã giữ hàng '+res.orders+' đơn ('+res.lines+' dòng) từ file');impRender()}
+  catch(e){toast('Lỗi: '+errMsg(e),true);b.disabled=false}}
+$('#impRead').onclick=async()=>{const t=$('#impPaste').value;const f=$('#impFile').files[0];$('#impReadMsg').textContent='';
+  try{if(t.trim()){impLoad(impSplit(t))}
+    else if(f){if(/\.(xlsx|xls)$/i.test(f.name)){$('#impReadMsg').textContent='Đang đọc file…';await loadXlsx();const wb=XLSX.read(await f.arrayBuffer(),{type:'array'});let best=null;
+        for(const n of wb.SheetNames){const m=XLSX.utils.sheet_to_json(wb.Sheets[n],{header:1,raw:true,defval:''});if(!best||m.length>best.length)best=m}impLoad(best||[]);$('#impReadMsg').textContent=''}
+      else impLoad(impSplit(await f.text()))}
+    else toast('Chọn file hoặc dán dữ liệu trước',true)}
+  catch(e){$('#impReadMsg').textContent='';toast('Không đọc được: '+errMsg(e),true)}};
+$('#impPlant').onchange=()=>{if(IMP.mat)impRender()};$('#impKD').onchange=()=>{if(IMP.mat)impRender()};
+$('#impGo').onclick=impGo;
 
 /* ---------- server API (Google Apps Script) ---------- */
 function errMsg(e){return String(e&&e.message||e).replace(/^Error:\s*/,'').replace(/^Exception:\s*/,'')}
