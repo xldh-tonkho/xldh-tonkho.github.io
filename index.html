@@ -1,0 +1,619 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Tồn kho khả dụng</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Be+Vietnam+Pro:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#f5f6f8;--card:#fff;--ink:#1d2433;--mute:#667085;--line:#e4e7ec;--soft:#f9fafb;
+  --pri:#1f5fbf;--pri-soft:#e8f0fc;--ok:#127a46;--ok-soft:#e6f4ec;--warn:#a15c00;--warn-soft:#fff4e0;
+  --bad:#b42318;--bad-soft:#fdecea;--r:10px;
+}
+*{box-sizing:border-box}
+html,body{margin:0;background:var(--bg);color:var(--ink);font:14px/1.45 "Be Vietnam Pro",system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
+button,input,select,textarea{font:inherit;color:inherit}
+header{background:var(--card);border-bottom:1px solid var(--line);position:sticky;top:0;z-index:20}
+.top{display:flex;align-items:center;gap:16px;padding:12px 20px;flex-wrap:wrap}
+.top h1{font-size:18px;margin:0;font-weight:700;letter-spacing:-.01em}
+.snap{font-size:12.5px;color:var(--mute);display:flex;gap:6px;align-items:center;flex-wrap:wrap}
+.pill{display:inline-flex;align-items:center;gap:4px;border-radius:999px;padding:2px 9px;font-size:12px;font-weight:600;white-space:nowrap}
+.pill.ok{background:var(--ok-soft);color:var(--ok)}.pill.warn{background:var(--warn-soft);color:var(--warn)}.pill.bad{background:var(--bad-soft);color:var(--bad)}.pill.info{background:var(--pri-soft);color:var(--pri)}
+nav{display:flex;gap:2px;padding:0 14px;overflow-x:auto}
+nav button{border:0;background:none;padding:10px 12px;border-bottom:2px solid transparent;color:var(--mute);font-weight:600;cursor:pointer;white-space:nowrap}
+nav button.on{color:var(--pri);border-color:var(--pri)}
+nav .cnt{background:var(--pri-soft);color:var(--pri);border-radius:999px;padding:0 7px;font-size:11.5px;margin-left:4px}
+main{padding:16px 20px 90px;max-width:1500px;margin:0 auto}
+.card{background:var(--card);border:1px solid var(--line);border-radius:var(--r);padding:14px 16px;margin-bottom:14px}
+.card h2{font-size:15px;margin:0 0 10px}
+.card h3{font-size:14px;margin:14px 0 6px}
+.row{display:flex;gap:10px;flex-wrap:wrap;align-items:center}
+.grow{flex:1 1 220px}
+input[type=text],input[type=number],input[type=date],input[type=search],select,textarea{border:1px solid #d0d5dd;border-radius:8px;padding:7px 10px;background:#fff;min-width:0}
+input:focus,select:focus,textarea:focus{outline:2px solid var(--pri-soft);border-color:var(--pri)}
+textarea{width:100%;min-height:120px;font-family:ui-monospace,Consolas,monospace;font-size:12px}
+label.chk{display:inline-flex;gap:6px;align-items:center;cursor:pointer;user-select:none}
+.btn{border:1px solid #d0d5dd;background:#fff;border-radius:8px;padding:7px 12px;cursor:pointer;font-weight:600;white-space:nowrap}
+.btn:hover{background:var(--soft)}
+.btn.pri{background:var(--pri);border-color:var(--pri);color:#fff}.btn.pri:hover{filter:brightness(1.07)}
+.btn.ok{background:var(--ok);border-color:var(--ok);color:#fff}
+.btn.bad{color:var(--bad);border-color:#f4c7c2}
+.btn.sm{padding:3px 9px;font-size:12.5px}
+.btn:disabled{opacity:.5;cursor:not-allowed}
+.seg{display:inline-flex;border:1px solid #d0d5dd;border-radius:8px;overflow:hidden}
+.seg button{border:0;background:#fff;padding:7px 11px;cursor:pointer;font-weight:600;color:var(--mute)}
+.seg button.on{background:var(--pri-soft);color:var(--pri)}
+.tw{overflow:auto;border:1px solid var(--line);border-radius:8px;background:#fff}
+table{border-collapse:collapse;width:100%;font-size:13px}
+th,td{padding:7px 10px;border-bottom:1px solid var(--line);text-align:left;white-space:nowrap}
+th{background:var(--soft);font-weight:600;color:#475467;position:sticky;top:0;z-index:1;cursor:default}
+th.s{cursor:pointer}th.s:hover{color:var(--pri)}
+td.n,th.n{text-align:right;font-variant-numeric:tabular-nums}
+td.desc{white-space:normal;min-width:200px;max-width:360px}
+tbody tr.click{cursor:pointer}tbody tr.click:hover{background:#f3f7fe}
+.av{font-weight:700}.av.pos{color:var(--ok)}.av.zero{color:var(--warn)}.av.neg{color:var(--bad)}
+.held{color:var(--pri);font-weight:600}
+.muted{color:var(--mute)}.small{font-size:12px}
+.empty{padding:28px;text-align:center;color:var(--mute)}
+.banner{border-radius:8px;padding:9px 12px;margin-bottom:12px;font-size:13px}
+.banner.warn{background:var(--warn-soft);color:#7a4500}.banner.bad{background:var(--bad-soft);color:#8a1c12}.banner.info{background:var(--pri-soft);color:#173f7a}
+.stats{display:flex;gap:10px;flex-wrap:wrap;margin-bottom:12px}
+.stat{background:var(--card);border:1px solid var(--line);border-radius:var(--r);padding:10px 14px;min-width:150px}
+.stat b{display:block;font-size:20px;font-variant-numeric:tabular-nums}.stat span{font-size:12px;color:var(--mute)}
+.ord{border:1px solid var(--line);border-radius:var(--r);background:#fff;margin-bottom:10px;overflow:hidden}
+.ord .hd{display:flex;gap:10px;align-items:center;flex-wrap:wrap;padding:9px 12px;background:var(--soft);border-bottom:1px solid var(--line)}
+.ord .hd .t{font-weight:700}
+.ord .hd .sp{flex:1}
+.ord table td,.ord table th{border-bottom:1px solid #f0f2f5}
+.cartbar{position:fixed;left:50%;transform:translateX(-50%);bottom:16px;z-index:30;background:var(--ink);color:#fff;border-radius:12px;padding:10px 12px 10px 16px;display:flex;gap:12px;align-items:center;box-shadow:0 8px 24px rgba(16,24,40,.25)}
+.cartbar .btn{border-color:transparent}
+.ov{position:fixed;inset:0;background:rgba(16,24,40,.45);z-index:50;display:flex;align-items:flex-start;justify-content:center;padding:6vh 12px;overflow:auto}
+.dlg{background:#fff;border-radius:12px;width:100%;max-width:560px;box-shadow:0 20px 40px rgba(16,24,40,.25)}
+.dlg.wide{max-width:900px}
+.dlg .dh{padding:14px 18px;border-bottom:1px solid var(--line);font-weight:700;font-size:15px;display:flex;justify-content:space-between;gap:10px}
+.dlg .db{padding:14px 18px}
+.dlg .df{padding:12px 18px;border-top:1px solid var(--line);display:flex;gap:8px;justify-content:flex-end;flex-wrap:wrap}
+.kv{display:grid;grid-template-columns:110px 1fr;gap:4px 10px;font-size:13px;margin-bottom:12px}
+.kv div:nth-child(odd){color:var(--mute)}
+.fld{display:flex;flex-direction:column;gap:4px;margin-bottom:10px}
+.fld>span{font-size:12.5px;color:#475467;font-weight:600}
+.fld input,.fld select,.fld textarea{width:100%}
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:0 12px}
+.big3{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:12px}
+.big3 div{background:var(--soft);border-radius:8px;padding:8px 10px}.big3 b{display:block;font-size:18px;font-variant-numeric:tabular-nums}.big3 span{font-size:11.5px;color:var(--mute)}
+.map{display:grid;grid-template-columns:repeat(auto-fill,minmax(170px,1fr));gap:8px 12px}
+.toast{position:fixed;top:14px;left:50%;transform:translateX(-50%);z-index:80;background:var(--ink);color:#fff;padding:9px 16px;border-radius:8px;font-size:13px;box-shadow:0 8px 20px rgba(0,0,0,.2);max-width:90vw}
+.toast.err{background:var(--bad)}
+.guide ol{padding-left:20px;margin:6px 0}.guide li{margin:5px 0}
+.guide code{background:var(--soft);border:1px solid var(--line);border-radius:4px;padding:0 4px;font-size:12.5px}
+.hide{display:none!important}
+.userbox{margin-left:auto;display:flex;gap:8px;align-items:center;font-size:13px}
+.big3.four{grid-template-columns:repeat(4,1fr)}
+table.sap{font:12px/1.35 Tahoma,"Segoe UI",Arial,sans-serif;font-feature-settings:"calt" 0,"liga" 0;border-collapse:collapse;color:#1b2a3a}
+table.sap th{background:linear-gradient(#eef3f8,#dce6f0);color:#24384f;font-weight:600;border:1px solid #b7c6d6;padding:4px 7px;font-size:12px}
+table.sap td{border:1px solid #d3dce6;padding:3px 7px;height:22px}
+table.sap tbody tr:nth-child(odd) td{background:#ffffff}
+table.sap tbody tr:nth-child(even) td{background:#eef4fb}
+table.sap tbody tr.click:hover td{background:#fff3c4}
+table.sap tbody tr.hasheld td.held{background:#e3edff}
+table.sap td.mat{font-weight:400}
+table.sap td.desc{min-width:180px;max-width:300px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+table.sap td.av{font-weight:700}
+#stockTable{border-color:#b7c6d6;border-radius:4px}
+@media (max-width:640px){main{padding:12px 10px 90px}.grid2{grid-template-columns:1fr}.top{padding:10px 12px}}
+</style>
+</head>
+<body>
+<header>
+  <div class="top">
+    <h1>Tồn kho khả dụng</h1>
+    <div class="snap" id="snapInfo"><span class="pill info">Đang kết nối…</span></div>
+    <div class="userbox" id="userBox"></div>
+  </div>
+  <nav id="nav">
+    <button data-tab="stock" class="on">Tồn khả dụng</button>
+    <button data-tab="orders">Đơn đang giữ <span class="cnt" id="cntOrders">0</span></button>
+    <button data-tab="history">Lịch sử</button>
+    <button data-tab="guide">Hướng dẫn</button>
+  </nav>
+</header>
+
+<main>
+  <div id="globalMsg"></div>
+
+  <!-- TAB: STOCK -->
+  <section id="tab-stock">
+    <div class="stats" id="stockStats"></div>
+    <div class="card">
+      <div class="row">
+        <input type="search" id="q" class="grow" placeholder="Tìm mã hàng, tên hàng hoặc số lô… (gõ nhiều từ để lọc kỹ hơn)">
+        <select id="fPlant"><option value="">Tất cả kho</option></select>
+        <select id="fSloc"><option value="">Tất cả kho con</option></select>
+        <div class="seg" id="mode"><button data-m="lot" class="on">Theo lô</button><button data-m="mat">Theo mã</button></div>
+        <label class="chk"><input type="checkbox" id="onlyAvail"> Chỉ còn khả dụng</label>
+        <label class="chk"><input type="checkbox" id="onlyHeld"> Chỉ dòng đang giữ</label>
+        <button class="btn" id="copyStock" title="Sao chép bảng đang lọc để dán vào Excel/Zalo">Sao chép bảng</button>
+      </div>
+    </div>
+    <div class="tw" id="stockTable"></div>
+    <div class="row" style="justify-content:center;margin-top:10px"><button class="btn hide" id="more">Xem thêm</button></div>
+  </section>
+
+  <!-- TAB: ORDERS -->
+  <section id="tab-orders" class="hide">
+    <div id="reconcile"></div>
+    <div class="card">
+      <div class="row">
+        <input type="search" id="oq" class="grow" placeholder="Lọc theo CH / khách, KD, mã hàng, số đơn SAP, mã giữ hàng…">
+        <button class="btn" id="bulkSo">Đóng theo danh sách số đơn SAP</button>
+        <button class="btn" id="copyOrders">Sao chép danh sách</button>
+      </div>
+    </div>
+    <div id="orderList"></div>
+  </section>
+
+  <!-- TAB: HISTORY -->
+  <section id="tab-history" class="hide">
+    <div class="card">
+      <div class="row">
+        <input type="search" id="hq" class="grow" placeholder="Lọc lịch sử…">
+        <button class="btn" id="hReload">Tải lại</button>
+      </div>
+      <div class="small muted" style="margin-top:6px">Hiển thị tối đa 300 dòng đã xuất / đã hủy gần nhất. Toàn bộ lịch sử nằm ở trang <b>DonGiu</b> trong file Google Sheet của app.</div>
+    </div>
+    <div class="tw" id="historyTable"><div class="empty">Đang tải…</div></div>
+  </section>
+
+  <!-- TAB: GUIDE -->
+  <section id="tab-guide" class="hide">
+    <div class="card guide">
+      <h2>Công thức</h2>
+      <p><b>Khả dụng = Hàng có sẵn − Tồn có đơn hàng</b>, tính riêng cho từng Plant × Mat. × Stor. Loc. × Màu × Batch.</p>
+      <ul>
+        <li><b>Hàng có sẵn</b>: đọc thẳng từ Google Sheet “Thông tin tồn kho”. App tự đọc lại mỗi 10 phút; vừa cập nhật Sheet xong muốn thấy ngay thì bấm <b>Tải lại</b> (góc trên bên phải).</li>
+        <li><b>Tồn có đơn hàng</b>: tổng các đơn XLĐH đang giữ trong app (lưu ở trang <b>DonGiu</b> của file app).</li>
+        <li>Cột “Khả dụng SAP” chỉ để tham khảo.</li>
+      </ul>
+      <h3>Khi có đơn · Giữ hàng</h3>
+      <ol>
+        <li>Tab <b>Tồn khả dụng</b> → gõ mã / tên / lô, chọn kho → bấm vào dòng lô cần lấy.</li>
+        <li>Nhập số lượng → <b>Thêm vào đơn</b>. Đơn nhiều mã thì bấm tiếp các dòng khác.</li>
+        <li>Bấm <b>Xem &amp; lưu đơn</b> → nhập <b>CH / khách đặt</b>, KD, số đơn SAP (nếu có) → <b>Lưu giữ hàng</b>. Khả dụng trừ ngay, người khác thấy trong vòng ~20 giây.</li>
+      </ol>
+      <h3>Khi hàng đã xuất / khách hủy · Đóng đơn</h3>
+      <ol>
+        <li>Tab <b>Đơn đang giữ</b> → <b>Đã xuất</b> (hàng đã xuất kho trên SAP) hoặc <b>Hủy</b> (khách hủy), theo từng dòng hoặc cả đơn.</li>
+        <li>Nhiều đơn cùng lúc: <b>Đóng theo danh sách số đơn SAP</b> → dán danh sách số đơn → app đóng hết các đơn khớp số.</li>
+        <li><b>Quan trọng:</b> hàng đã xuất mà không đóng đơn thì bị trừ 2 lần (Hàng có sẵn đã giảm + app vẫn giữ). Khung <b>Cần kiểm tra</b> ở tab Đơn đang giữ sẽ nhắc các dòng nghi đã xuất.</li>
+      </ol>
+      <h3>Tài khoản</h3>
+      <ol>
+        <li>Quản trị thêm người dùng ở trang <b>TaiKhoan</b> trong file Google Sheet của app: Tên đăng nhập · Mật khẩu · Họ tên · Quyền · Hoạt động.</li>
+        <li>Quyền <b>admin</b>/<b>xldh</b>: xem + giữ/đóng đơn. Quyền <b>xem</b>: chỉ xem (hợp cho KD). Khóa tài khoản: đổi cột Hoạt động thành FALSE.</li>
+        <li>Đăng nhập được giữ 6 giờ trên mỗi máy; bấm <b>Đăng xuất</b> khi dùng máy chung.</li>
+      </ol>
+    </div>
+  </section>
+</main>
+
+<div id="cartbar" class="cartbar hide"><span id="cartTxt"></span><button class="btn sm" id="cartClear" style="background:#344054;color:#fff">Bỏ</button><button class="btn pri sm" id="cartOpen">Xem &amp; lưu đơn</button></div>
+<div id="loginOv" class="ov lov hide" style="align-items:center"><div class="dlg" style="max-width:380px">
+  <div class="dh">Đăng nhập · Tồn kho khả dụng</div>
+  <form class="db" id="loginForm">
+    <label class="fld"><span>Tên đăng nhập</span><input type="text" id="lgUser" autocomplete="username" autocapitalize="off"></label>
+    <label class="fld"><span>Mật khẩu</span><input type="password" id="lgPass" autocomplete="current-password"></label>
+    <div id="lgErr" class="small" style="color:var(--bad);min-height:18px"></div>
+    <button class="btn pri" style="width:100%" id="lgBtn" type="submit">Đăng nhập</button>
+  </form></div></div>
+<div id="modalRoot"></div>
+<datalist id="dlCH"></datalist><datalist id="dlKD"></datalist>
+
+<script>
+(function(){
+'use strict';
+/* ---------- helpers ---------- */
+const $=s=>document.querySelector(s);
+const esc=s=>String(s==null?'':s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const norm=s=>String(s==null?'':s).normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/[đĐ]/g,'d').toLowerCase().trim();
+const r3=n=>Math.round((+n||0)*1000)/1000;
+const fmtN=n=>r3(n).toLocaleString('vi-VN',{maximumFractionDigits:3});
+const keyOf=(m,p,s,b,x)=>[m,p,s,b,x||''].join('\u0001');
+const kOf=o=>keyOf(o.m,o.p,o.s,o.b,o.x);
+const clean=v=>String(v==null?'':v).replace(/[\t\r\n]+/g,' ').trim();
+const pad=n=>String(n).padStart(2,'0');
+const todayStr=()=>{const d=new Date();return d.getFullYear()+'-'+pad(d.getMonth()+1)+'-'+pad(d.getDate())};
+const fmtDate=s=>{if(!s)return'';const p=String(s).slice(0,10).split('-');return p.length===3?p[2]+'/'+p[1]+'/'+p[0]:s};
+const fmtDT=iso=>{if(!iso)return'';const d=new Date(iso);if(isNaN(d))return'';return pad(d.getDate())+'/'+pad(d.getMonth()+1)+' '+pad(d.getHours())+':'+pad(d.getMinutes())};
+const avCls=a=>a>0.0005?'pos':(a<-0.0005?'neg':'zero');
+const normSo=s=>clean(s).replace(/^0+/,'').toUpperCase();
+function toast(msg,err){document.querySelectorAll('.toast').forEach(x=>x.remove());const t=document.createElement('div');t.className='toast'+(err?' err':'');t.textContent=msg;document.body.appendChild(t);setTimeout(()=>t.remove(),err?5000:2600)}
+async function copyText(txt){try{await navigator.clipboard.writeText(txt);toast('Đã sao chép – dán vào Excel/Zalo được ngay')}catch(e){showTextDialog('Sao chép thủ công',txt)}}
+
+/* ---------- state ---------- */
+const S={db:null,user:null,meId:null,canWrite:null,canAdmin:false,
+  meta:null,metaLoaded:false,stock:[],stockByKey:new Map(),plants:[],slocs:[],
+  orders:[],ordersLoaded:false,resv:new Map(),cart:[],names:{},
+  view:{q:'',plant:'',sloc:'',onlyAvail:false,onlyHeld:false,mode:'lot',sort:'m',dir:1,limit:200},
+  imp:null,tab:'stock'};
+
+/* ---------- modal helpers ---------- */
+function openModal(html,wide){const ov=document.createElement('div');ov.className='ov';ov.innerHTML='<div class="dlg'+(wide?' wide':'')+'">'+html+'</div>';
+  ov.addEventListener('mousedown',e=>{if(e.target===ov)ov.remove()});$('#modalRoot').appendChild(ov);
+  const f=ov.querySelector('[autofocus]');if(f)setTimeout(()=>{f.focus();if(f.select)f.select()},30);return ov}
+function confirmBox(title,msg,okLabel,danger){return new Promise(res=>{const ov=openModal('<div class="dh">'+esc(title)+'</div><div class="db">'+msg+'</div><div class="df"><button class="btn" data-x>Thôi</button><button class="btn '+(danger?'bad':'pri')+'" data-ok autofocus>'+esc(okLabel||'Đồng ý')+'</button></div>');
+  ov.querySelector('[data-x]').onclick=()=>{ov.remove();res(false)};ov.querySelector('[data-ok]').onclick=()=>{ov.remove();res(true)}})}
+function inputBox(title,label,value,type){return new Promise(res=>{const ov=openModal('<div class="dh">'+esc(title)+'</div><div class="db"><label class="fld"><span>'+esc(label)+'</span><input type="'+(type||'text')+'" step="any" value="'+esc(value)+'" autofocus></label></div><div class="df"><button class="btn" data-x>Thôi</button><button class="btn pri" data-ok>Lưu</button></div>');
+  const inp=ov.querySelector('input');const ok=()=>{ov.remove();res(inp.value)};
+  inp.addEventListener('keydown',e=>{if(e.key==='Enter')ok()});ov.querySelector('[data-x]').onclick=()=>{ov.remove();res(null)};ov.querySelector('[data-ok]').onclick=ok})}
+function showTextDialog(title,txt){const ov=openModal('<div class="dh">'+esc(title)+'</div><div class="db"><div class="small muted" style="margin-bottom:6px">Bấm vào ô, Ctrl+A rồi Ctrl+C.</div><textarea readonly style="min-height:240px">'+esc(txt)+'</textarea></div><div class="df"><button class="btn" data-x>Đóng</button></div>',true);
+  ov.querySelector('[data-x]').onclick=()=>ov.remove()}
+
+/* ---------- stock / reservations compute ---------- */
+function rebuildStockIndex(){
+  S.stockByKey=new Map();const pl=new Set(),sl=new Set();S.pName={};
+  for(const r of S.stock){if(r.n&&r.p)S.pName[r.p]=r.n;r.k=kOf(r);r._n=norm(r.m+' '+r.d+' '+r.b+' '+(r.n||''));S.stockByKey.set(r.k,r);if(r.p)pl.add(r.p);if(r.s)sl.add(r.s)}
+  S.plants=[...pl].sort();S.slocs=[...sl].sort();fillFilters();
+}
+function rebuildResv(){
+  S.resv=new Map();
+  for(const o of S.orders){const k=kOf(o);const x=S.resv.get(k)||{q:0,list:[]};x.q=r3(x.q+(+o.qty||0));x.list.push(o);S.resv.set(k,x)}
+  $('#cntOrders').textContent=new Set(S.orders.map(o=>o.orderNo)).size;
+  // datalists
+  const ch=new Set(),kd=new Set();S.orders.forEach(o=>{if(o.ch)ch.add(o.ch);if(o.kd)kd.add(o.kd)});
+  try{const saved=JSON.parse(localStorage.getItem('tk_names')||'{}');(saved.ch||[]).forEach(x=>ch.add(x));(saved.kd||[]).forEach(x=>kd.add(x))}catch(e){}
+  $('#dlCH').innerHTML=[...ch].sort().map(x=>'<option value="'+esc(x)+'">').join('');
+  $('#dlKD').innerHTML=[...kd].sort().map(x=>'<option value="'+esc(x)+'">').join('');
+}
+const heldOf=k=>(S.resv.get(k)||{q:0}).q;
+const useA0=()=>false;
+const baseOf=r=>r?(useA0()&&r.a0!=null&&r.a0!==''?(+r.a0||0):(+r.q||0)):0;
+const availOf=k=>r3(baseOf(S.stockByKey.get(k))-heldOf(k));
+const doneLbl=()=>useA0()?'Đã lên SAP':'Đã xuất';
+const L=()=>Object.assign({p:'Plant',n:'Name 1',m:'Mat.',d:'Material Description',s:'Stor. Loc.',u:'Un',x:'M..',b:'Batch',q:'Hàng có sẵn',a0:'Khả dụng SAP',g:'ExtMatlGroup'},(S.meta&&S.meta.labels)||{},{a0:'Khả dụng SAP'});
+const has=f=>!!(S.meta&&S.meta.cols&&S.meta.cols.includes(f));
+
+function fillFilters(){
+  const fp=$('#fPlant'),fs=$('#fSloc');const vp=fp.value,vs=fs.value;
+  fp.innerHTML='<option value="">Tất cả kho</option>'+S.plants.map(p=>'<option value="'+esc(p)+'"'+(p===vp?' selected':'')+'>'+esc(p)+(S.pName&&S.pName[p]?' – '+esc(S.pName[p]):'')+'</option>').join('');
+  fs.innerHTML='<option value="">Tất cả kho con</option>'+S.slocs.map(p=>'<option'+(p===vs?' selected':'')+'>'+esc(p)+'</option>').join('');
+}
+
+function currentRows(){
+  const V=S.view,terms=norm(V.q).split(/\s+/).filter(Boolean);
+  let rows=[];
+  for(const r of S.stock){
+    if(V.plant&&r.p!==V.plant)continue;if(V.sloc&&r.s!==V.sloc)continue;
+    if(terms.length&&!terms.every(t=>r._n.includes(t)))continue;
+    const h=heldOf(r.k);const a0=(r.a0===''||r.a0==null)?null:+r.a0;rows.push({r,m:r.m,d:r.d,p:r.p,n:r.n,s:r.s,x:r.x,g:r.g,b:r.b,u:r.u,q:r.q,a0,h,a:r3(baseOf(r)-h),k:r.k,lots:1});
+  }
+  // reservations whose lot no longer in stock (show as negative rows)
+  for(const [k,x] of S.resv){if(S.stockByKey.has(k))continue;const o=x.list[0];
+    if(V.plant&&o.p!==V.plant)continue;if(V.sloc&&o.s!==V.sloc)continue;
+    if(terms.length&&!terms.every(t=>norm(o.m+' '+o.d+' '+o.b).includes(t)))continue;
+    rows.push({r:null,m:o.m,d:o.d,p:o.p,n:o.n||'',s:o.s,x:o.x||'',g:o.g||'',b:o.b,u:o.u,q:0,a0:0,h:x.q,a:r3(-x.q),k,lots:1,gone:true})}
+  if(V.mode==='mat'){const g=new Map();
+    for(const x of rows){const gk=x.m+'\u0001'+x.p;const y=g.get(gk);
+      if(!y)g.set(gk,{m:x.m,d:x.d,p:x.p,n:x.n,s:'',x:'',b:'',g:x.g,u:x.u,q:x.q,a0:x.a0,h:x.h,a:x.a,lots:1,k:gk});
+      else{y.q=r3(y.q+x.q);if(x.a0!=null)y.a0=r3((y.a0||0)+x.a0);y.h=r3(y.h+x.h);y.a=r3(y.a+x.a);y.lots++}}
+    rows=[...g.values()]}
+  if(V.onlyAvail)rows=rows.filter(x=>x.a>0.0005);
+  if(V.onlyHeld)rows=rows.filter(x=>x.h>0.0005);
+  const f=V.sort,dir=V.dir;
+  rows.sort((A,B)=>{let a=A[f],b=B[f];if(typeof a==='number'||typeof b==='number')return((+a||0)-(+b||0))*dir;
+    const c=String(a||'').localeCompare(String(b||''),'vi',{numeric:true});if(c)return c*dir;
+    for(const t of ['m','p','s','b','x']){const z=String(A[t]||'').localeCompare(String(B[t]||''),'vi',{numeric:true});if(z)return z}return 0});
+  return rows;
+}
+
+function renderStats(){
+  const st=$('#stockStats');if(!S.metaLoaded){st.innerHTML='';return}
+  const mats=new Set(S.stock.map(r=>r.m)).size;const ord=new Set(S.orders.map(o=>o.orderNo)).size;
+  let neg=0;for(const [k] of S.resv){if(availOf(k)<-0.0005)neg++}
+  st.innerHTML='<div class="stat"><b>'+mats.toLocaleString('vi-VN')+'</b><span>mã hàng</span></div>'+
+    '<div class="stat"><b>'+S.stock.length.toLocaleString('vi-VN')+'</b><span>dòng mã × kho × lô</span></div>'+
+    '<div class="stat"><b>'+ord+'</b><span>đơn đang giữ ('+S.orders.length+' dòng)</span></div>'+
+    '<div class="stat"><b style="color:'+(neg?'var(--bad)':'inherit')+'">'+neg+'</b><span>dòng khả dụng âm</span></div>';
+}
+
+function thS(f,label,num){const V=S.view;const ar=V.sort===f?(V.dir>0?' ▲':' ▼'):'';return '<th class="s'+(num?' n':'')+'" data-sort="'+f+'">'+label+ar+'</th>'}
+function renderStock(){
+  renderStats();
+  const box=$('#stockTable');
+  if(!S.sess){box.innerHTML='<div class="empty">Đăng nhập để xem tồn kho.</div>';return}
+  if(!S.metaLoaded){box.innerHTML='<div class="empty">Đang tải tồn kho…</div>';return}
+  if(!S.stock.length&&!S.orders.length){box.innerHTML='<div class="empty">Chưa có dữ liệu tồn. Vào tab <b>Cập nhật tồn SAP</b> để nạp tồn kho lần đầu.</div>';$('#more').classList.add('hide');return}
+  const rows=currentRows();const V=S.view;const lot=V.mode==='lot';
+  const shown=rows.slice(0,V.limit);const Lb=L();
+  const cols=[['p',Lb.p],has('n')&&['n',Lb.n],['m',Lb.m],['d',Lb.d]];
+  if(lot)cols.push(['s',Lb.s]);cols.push(['u',Lb.u,0,1]);if(lot){if(has('x'))cols.push(['x',Lb.x]);cols.push(['b',Lb.b])}else cols.push(['lots','Số lô',1]);
+  cols.push(['q',Lb.q,1]);if(has('a0'))cols.push(['a0',Lb.a0,1]);cols.push(['h','Tồn có đơn hàng',1],['a','Khả dụng',1]);if(has('g'))cols.push(['g',Lb.g]);
+  const C=cols.filter(Boolean);
+  let h='<table class="sap"><thead><tr>'+C.map(c=>c[3]?'<th>'+esc(c[1])+'</th>':thS(c[0],esc(c[1]),c[2])).join('')+'</tr></thead><tbody>';
+  const cell=(x,f)=>{switch(f){
+    case 'm':return '<td class="mat">'+esc(x.m)+'</td>';
+    case 'd':return '<td class="desc">'+esc(x.d)+'</td>';
+    case 'b':return '<td>'+esc(x.b)+(x.gone?' <span class="pill bad">hết trên SAP</span>':'')+'</td>';
+    case 'q':return '<td class="n">'+fmtN(x.q)+'</td>';
+    case 'a0':return '<td class="n">'+(x.a0==null?'':fmtN(x.a0))+'</td>';
+    case 'h':return '<td class="n held">'+(x.h?fmtN(x.h):'')+'</td>';
+    case 'a':return '<td class="n av '+avCls(x.a)+'">'+fmtN(x.a)+'</td>';
+    case 'lots':return '<td class="n">'+x.lots+'</td>';
+    default:return '<td>'+esc(x[f])+'</td>'}};
+  for(const x of shown){
+    h+='<tr class="click'+(x.h?' hasheld':'')+'" data-k="'+esc(x.k)+'" data-mode="'+(lot?'lot':'mat')+'">'+C.map(c=>cell(x,c[0])).join('')+'</tr>';
+  }
+  if(!shown.length)h+='<tr><td colspan="'+C.length+'" class="empty">Không có dòng nào khớp bộ lọc.</td></tr>';
+  h+='</tbody></table>';box.innerHTML=h;
+  const more=$('#more');if(rows.length>V.limit){more.classList.remove('hide');more.textContent='Xem thêm ('+(rows.length-V.limit).toLocaleString('vi-VN')+' dòng nữa)'}else more.classList.add('hide');
+}
+
+/* ---------- header snapshot info ---------- */
+const ageH=m=>m&&m.at?(Date.now()-Date.parse(m.at))/36e5:1e9;
+function renderSnap(){
+  const el=$('#snapInfo');
+  if(!S.sess){el.innerHTML='';return}
+  if(!S.metaLoaded){el.innerHTML='<span class="pill info">Đang tải…</span>';return}
+  if(!S.meta){el.innerHTML='<span class="pill warn">Chưa có tồn SAP</span>';return}
+  const m=S.meta,fresh=ageH(m)<=30;
+  el.innerHTML='Tồn đọc từ Google Sheet lúc <b>'+esc(fmtDT(m.at))+'</b> '+'';
+}
+function nameOf(id){return id?'· bởi '+id:''}
+function wantNames(){}
+
+/* ---------- hold dialog + cart ---------- */
+function openHold(k){
+  let r=S.stockByKey.get(k);
+  if(!r){const x=S.resv.get(k);if(!x)return;const o=x.list[0];r={m:o.m,d:o.d,p:o.p,n:o.n||'',s:o.s,x:o.x||'',g:o.g||'',b:o.b,u:o.u,q:0,a0:0,k}}
+  const h=heldOf(k);const inCart=S.cart.filter(c=>c.k===k).reduce((s,c)=>s+c.qty,0);const base=baseOf(r);const a=r3(base-h-inCart);const Lb=L();
+  const list=(S.resv.get(k)||{list:[]}).list;
+  const lh=list.length?'<h3 style="margin:4px 0 6px;font-size:13px">Đang giữ trên lô này</h3><div class="tw" style="max-height:160px;margin-bottom:12px"><table><thead><tr><th>CH / khách</th><th>KD</th><th class="n">SL</th><th>Ngày</th></tr></thead><tbody>'+
+    list.map(o=>'<tr><td>'+esc(o.ch)+'</td><td>'+esc(o.kd)+'</td><td class="n">'+fmtN(o.qty)+'</td><td>'+esc(fmtDT(o.createdAt))+'</td></tr>').join('')+'</tbody></table></div>':'';
+  const ro=S.canWrite===false;
+  const ov=openModal('<div class="dh"><span>'+esc(r.m)+' · Lô '+esc(r.b||'—')+(r.x?' · '+esc(L().x)+' '+esc(r.x):'')+'</span><span class="muted small">'+esc(r.p)+(r.n?' '+esc(r.n):'')+(r.s?' / '+esc(r.s):'')+'</span></div><div class="db">'+
+    '<div class="small" style="margin-bottom:10px">'+esc(r.d)+'</div>'+
+    '<div class="big3'+(has('a0')?' four':'')+'"><div><span>'+esc(Lb.q)+'</span><b>'+fmtN(r.q)+'</b></div>'+(has('a0')?'<div><span>'+esc(Lb.a0)+'</span><b>'+fmtN(+r.a0||0)+'</b></div>':'')+'<div><span>Tồn có đơn hàng'+(inCart?' + đang soạn':'')+'</span><b class="held">'+fmtN(h+inCart)+'</b></div><div><span>Khả dụng</span><b class="av '+avCls(a)+'">'+fmtN(a)+' '+esc(r.u)+'</b></div></div>'+lh+
+    (ro?'<div class="banner warn">Bạn đang ở quyền chỉ xem nên không giữ hàng được.</div>':'<label class="fld"><span>Số lượng đơn hàng ('+esc(r.u)+')</span><input type="number" step="any" min="0" id="hQty" autofocus placeholder="Nhập số lượng"></label><div id="hWarn"></div>')+
+    '</div><div class="df"><button class="btn" data-x>Đóng</button>'+(ro?'':'<button class="btn pri" data-add>Thêm vào đơn</button>')+'</div>');
+  ov.querySelector('[data-x]').onclick=()=>ov.remove();
+  if(ro)return;
+  const inp=ov.querySelector('#hQty'),warn=ov.querySelector('#hWarn');
+  const chk=()=>{const v=+inp.value;warn.innerHTML=v>a+0.0005?'<div class="banner warn">Vượt khả dụng '+fmtN(v-a)+' '+esc(r.u)+'. Vẫn thêm được nếu chắc chắn (ví dụ hàng sắp nhập).</div>':''};
+  inp.addEventListener('input',chk);
+  const add=()=>{const v=r3(+inp.value);if(!(v>0)){inp.focus();toast('Nhập số lượng lớn hơn 0',true);return}
+    S.cart.push({k,m:r.m,d:r.d,p:r.p,n:r.n||'',s:r.s,x:r.x||'',g:r.g||'',b:r.b,u:r.u,qty:v});ov.remove();renderCart();renderStock();toast('Đã thêm '+fmtN(v)+' '+r.u+' · '+r.m+' vào đơn')};
+  inp.addEventListener('keydown',e=>{if(e.key==='Enter')add()});ov.querySelector('[data-add]').onclick=add;
+}
+function renderCart(){
+  const bar=$('#cartbar');if(!S.cart.length){bar.classList.add('hide');return}
+  bar.classList.remove('hide');const tot=S.cart.length;$('#cartTxt').textContent='Đơn đang soạn: '+tot+' dòng';
+}
+function openCart(){
+  const last=(()=>{try{return JSON.parse(localStorage.getItem('tk_last')||'{}')}catch(e){return{}}})();
+  const ov=openModal('<div class="dh">Lưu giữ hàng cho đơn</div><div class="db">'+
+    '<div class="grid2"><label class="fld"><span>CH / khách đặt *</span><input type="text" id="cCH" list="dlCH" autofocus></label>'+
+    '<label class="fld"><span>KD</span><input type="text" id="cKD" list="dlKD" value="'+esc(last.kd||'')+'"></label>'+
+    '<label class="fld"><span>Số đơn SAP (nếu đã có)</span><input type="text" id="cSO" placeholder="Giúp đóng đơn hàng loạt"></label>'+
+    '<label class="fld"><span>Ghi chú</span><input type="text" id="cNote"></label></div>'+
+    '<div class="tw" id="cLines"></div><div id="cWarn" style="margin-top:10px"></div></div>'+
+    '<div class="df"><button class="btn" data-x>Đóng</button><button class="btn ok" data-save>Lưu giữ hàng</button></div>',true);
+  let force=false;
+  const lines=()=>{
+    const fc=ov.querySelector('#cForce');if(fc)force=fc.checked;
+    const used=new Map();let warn=[];
+    let h='<table><thead><tr><th>Mã</th><th>Tên hàng</th><th>Kho</th><th>Lô</th><th class="n">Khả dụng</th><th class="n">SL giữ</th><th></th></tr></thead><tbody>';
+    S.cart.forEach((c,i)=>{const prev=used.get(c.k)||0;const a=r3(availOf(c.k)-prev);used.set(c.k,prev+c.qty);if(c.qty>a+0.0005)warn.push(c.m+' lô '+(c.b||'—')+' vượt '+fmtN(c.qty-a)+' '+c.u);
+      h+='<tr><td><b>'+esc(c.m)+'</b></td><td class="desc">'+esc(c.d)+'</td><td>'+esc(c.p)+(c.s?' / '+esc(c.s):'')+'</td><td>'+esc(c.b)+(c.x?' · '+esc(c.x):'')+'</td><td class="n av '+avCls(a)+'">'+fmtN(a)+'</td>'+
+      '<td class="n"><input type="number" step="any" min="0" data-q="'+i+'" value="'+c.qty+'" style="width:100px;text-align:right"> '+esc(c.u)+'</td><td><button class="btn sm bad" data-del="'+i+'">Xóa</button></td></tr>'});
+    h+='</tbody></table>';ov.querySelector('#cLines').innerHTML=h;
+    ov.querySelector('#cWarn').innerHTML=warn.length?'<div class="banner warn"><b>Vượt khả dụng:</b> '+warn.map(esc).join('; ')+'<br><label class="chk" style="margin-top:6px"><input type="checkbox" id="cForce"'+(force?' checked':'')+'> Tôi đã kiểm tra, vẫn giữ hàng</label></div>':'';
+    ov.querySelectorAll('[data-del]').forEach(b=>b.onclick=()=>{S.cart.splice(+b.dataset.del,1);renderCart();renderStock();if(!S.cart.length){ov.remove();return}lines()});
+    ov.querySelectorAll('[data-q]').forEach(inp=>inp.onchange=()=>{const v=r3(+inp.value);if(v>0){S.cart[+inp.dataset.q].qty=v}lines();renderStock()});
+    return warn.length;
+  };
+  lines();
+  ov.querySelector('[data-x]').onclick=()=>ov.remove();
+  const saveBtn=ov.querySelector('[data-save]');
+  saveBtn.onclick=async()=>{
+    const ch=clean(ov.querySelector('#cCH').value),kd=clean(ov.querySelector('#cKD').value),so=clean(ov.querySelector('#cSO').value),note=clean(ov.querySelector('#cNote').value);
+    if(!ch){toast('Nhập CH / khách đặt',true);ov.querySelector('#cCH').focus();return}
+    const w=lines();if(w&&!force){toast('Có dòng vượt khả dụng – tick xác nhận hoặc sửa số lượng',true);return}
+    saveBtn.disabled=true;saveBtn.textContent='Đang lưu…';
+    let orderNo='';
+    const now=new Date().toISOString();let ok=0;
+    try{
+      for(let i=0;i<S.cart.length;i++){const c=S.cart[i];
+        }
+      const res=await api('addOrder',{ch,kd,so,note,force:!!force,lines:S.cart.map(c=>({m:c.m,d:c.d,p:c.p,n:c.n,s:c.s,x:c.x,g:c.g,b:c.b,u:c.u,qty:c.qty}))});ok=S.cart.length;orderNo=res.orderNo;refreshState();
+      try{const sv=JSON.parse(localStorage.getItem('tk_names')||'{}');sv.ch=[...new Set([ch,...(sv.ch||[])])].slice(0,200);if(kd)sv.kd=[...new Set([kd,...(sv.kd||[])])].slice(0,100);localStorage.setItem('tk_names',JSON.stringify(sv));localStorage.setItem('tk_last',JSON.stringify({kd}))}catch(e){}
+      S.cart=[];renderCart();ov.remove();toast('Đã giữ hàng · '+orderNo+' ('+ok+' dòng)');
+    }catch(e){handleWriteErr(e);renderCart();saveBtn.disabled=false;saveBtn.textContent='Lưu giữ hàng';
+      const m=errMsg(e);
+      if(m.indexOf('VUOT_KHA_DUNG')>=0){await refreshState();lines();
+        ov.querySelector('#cWarn').insertAdjacentHTML('afterbegin','<div class="banner bad"><b>Chưa lưu – người khác vừa giữ hàng trước:</b> '+esc(m.replace(/^.*VUOT_KHA_DUNG:\s*/,''))+'.<br>Sửa lại số lượng, hoặc tick “vẫn giữ hàng” nếu chắc chắn.</div>');
+        toast('Khả dụng vừa thay đổi – kiểm tra lại số lượng',true)}
+      else{toast('Lưu lỗi: '+m,true);lines()}}
+  };
+}
+function handleWriteErr(){}
+
+/* ---------- orders tab ---------- */
+function groupOrders(list){const g=new Map();for(const o of list){if(!g.has(o.orderNo))g.set(o.orderNo,[]);g.get(o.orderNo).push(o)}
+  return [...g.entries()].map(([no,ls])=>({no,ls:ls.sort((a,b)=>(a.line||0)-(b.line||0)),o:ls[0]})).sort((a,b)=>String(b.o.createdAt).localeCompare(String(a.o.createdAt)))}
+function issues(){const out=[];for(const o of S.orders){const k=kOf(o);if(!S.stockByKey.has(k))out.push({o,why:'Lô không còn trong tồn SAP'});else if(availOf(k)<-0.0005)out.push({o,why:'Khả dụng âm '+fmtN(availOf(k))})}return out}
+function renderOrders(){
+  const box=$('#orderList');
+  if(!S.ordersLoaded){box.innerHTML='<div class="empty">Đang tải đơn…</div>';$('#reconcile').innerHTML='';return}
+  // reconcile
+  const iss=S.meta?issues():[];
+  $('#reconcile').innerHTML=iss.length?'<div class="card" style="border-color:#f4c7c2"><h2 style="color:var(--bad)">Cần kiểm tra ('+iss.length+' dòng)</h2><div class="small muted" style="margin-bottom:8px">Sau lần cập nhật tồn SAP, các dòng dưới đây có thể đã xuất hàng trên SAP nhưng chưa đóng trong app (đang bị trừ 2 lần).</div><div class="tw"><table><thead><tr><th>Mã giữ</th><th>CH / khách</th><th>Mã</th><th>Lô</th><th>Kho</th><th class="n">SL</th><th>Số SAP</th><th>Lý do</th><th></th></tr></thead><tbody>'+
+    iss.map(({o,why})=>'<tr><td>'+esc(o.orderNo)+'</td><td>'+esc(o.ch)+'</td><td><b>'+esc(o.m)+'</b></td><td>'+esc(o.b)+'</td><td>'+esc(o.p)+(o.s?' / '+esc(o.s):'')+'</td><td class="n">'+fmtN(o.qty)+'</td><td>'+esc(o.so)+'</td><td><span class="pill bad">'+esc(why)+'</span></td><td>'+(S.canWrite===false?'':'<button class="btn sm ok" data-close="'+esc(o.id)+'">'+doneLbl()+'</button>')+'</td></tr>').join('')+'</tbody></table></div></div>':'';
+  const q=norm($('#oq').value);const terms=q.split(/\s+/).filter(Boolean);
+  const list=S.orders.filter(o=>!terms.length||terms.every(t=>norm([o.orderNo,o.ch,o.kd,o.so,o.m,o.d,o.b,o.note].join(' ')).includes(t)));
+  const groups=groupOrders(list);wantNames(groups.map(g=>g.o.createdBy));
+  if(!groups.length){box.innerHTML='<div class="empty">'+(S.orders.length?'Không có đơn khớp bộ lọc.':'Chưa có đơn nào đang giữ hàng.')+'</div>';return}
+  const ro=S.canWrite===false;
+  box.innerHTML=groups.map(g=>{const o=g.o;
+    return '<div class="ord"><div class="hd"><span class="t">'+esc(o.ch)+'</span>'+(o.kd?'<span class="pill info">KD '+esc(o.kd)+'</span>':'')+
+      (o.so?'<span class="pill ok">SAP '+esc(o.so)+'</span>':'<span class="pill warn">Chưa có số SAP</span>')+
+      '<span class="muted small">'+esc(g.no)+' · '+esc(fmtDT(o.createdAt))+' '+esc(nameOf(o.createdBy))+'</span>'+(o.note?'<span class="small">📝 '+esc(o.note)+'</span>':'')+'<span class="sp"></span>'+
+      (ro?'':'<button class="btn sm" data-so="'+esc(g.no)+'">'+(o.so?'Sửa số SAP':'Nhập số SAP')+'</button><button class="btn sm bad" data-cancelall="'+esc(g.no)+'">Hủy đơn</button><button class="btn sm ok" data-closeall="'+esc(g.no)+'">'+doneLbl()+' cả đơn</button>')+
+      '</div><div style="overflow:auto"><table><thead><tr><th>Mã</th><th>Tên hàng</th><th>Kho</th><th>Lô</th><th class="n">SL giữ</th><th>ĐVT</th><th class="n">Khả dụng lô</th><th></th></tr></thead><tbody>'+
+      g.ls.map(l=>{const a=availOf(kOf(l));return '<tr><td><b>'+esc(l.m)+'</b></td><td class="desc">'+esc(l.d)+'</td><td>'+esc(l.p)+(l.s?' / '+esc(l.s):'')+'</td><td>'+esc(l.b)+'</td><td class="n held">'+fmtN(l.qty)+'</td><td>'+esc(l.u)+'</td><td class="n av '+avCls(a)+'">'+fmtN(a)+'</td><td>'+
+        (ro?'':'<button class="btn sm" data-edit="'+esc(l.id)+'">Sửa SL</button> <button class="btn sm bad" data-cancel="'+esc(l.id)+'">Hủy</button> <button class="btn sm ok" data-close="'+esc(l.id)+'">'+doneLbl()+'</button>')+'</td></tr>'}).join('')+
+      '</tbody></table></div></div>'}).join('');
+}
+async function setStatus(ids,status){
+  let ok=0;const now=new Date().toISOString();
+  try{ok=await api('setStatus',ids,status);refreshState();
+    toast((status==='xong'?'Đã đóng ('+doneLbl().toLowerCase()+') ':'Đã hủy ')+ok+' dòng')}
+  catch(e){toast('Lỗi: '+errMsg(e),true)}
+}
+async function onOrdersClick(e){
+  const b=e.target.closest('button');if(!b)return;const d=b.dataset;
+  const byId=id=>S.orders.find(o=>o.id===id);
+  if(d.close){const o=byId(d.close);if(o&&await confirmBox(doneLbl(),'<b>'+esc(o.m)+'</b> lô '+esc(o.b)+' · '+fmtN(o.qty)+' '+esc(o.u)+' của <b>'+esc(o.ch)+'</b> '+(useA0()?'đã tạo đơn trên SAP (SAP đã trừ khả dụng)?':'đã xuất kho trên SAP?'),doneLbl()))await setStatus([o.id],'xong')}
+  else if(d.cancel){const o=byId(d.cancel);if(o&&await confirmBox('Hủy giữ hàng','Hủy dòng <b>'+esc(o.m)+'</b> · '+fmtN(o.qty)+' '+esc(o.u)+' của <b>'+esc(o.ch)+'</b>? Số lượng trả lại khả dụng.','Hủy dòng',true))await setStatus([o.id],'huy')}
+  else if(d.closeall||d.cancelall){const no=d.closeall||d.cancelall;const ls=S.orders.filter(o=>o.orderNo===no);const st=d.closeall?'xong':'huy';
+    if(await confirmBox(st==='xong'?doneLbl()+' cả đơn':'Hủy cả đơn',(st==='xong'?doneLbl()+': ':'Hủy ')+ls.length+' dòng của <b>'+esc(ls[0]&&ls[0].ch)+'</b> ('+esc(no)+')?',st==='xong'?doneLbl():'Hủy đơn',st==='huy'))await setStatus(ls.map(o=>o.id),st)}
+  else if(d.edit){const o=byId(d.edit);if(!o)return;const v=await inputBox('Sửa số lượng giữ',o.m+' lô '+(o.b||'—')+' ('+o.u+')',o.qty,'number');if(v==null)return;const n=r3(+v);
+    if(!(n>0)){toast('Số lượng phải lớn hơn 0 (muốn bỏ thì bấm Hủy)',true);return}
+    try{await api('updateQty',o.id,n);toast('Đã sửa số lượng');refreshState()}catch(e){toast('Lỗi: '+errMsg(e),true)}}
+  else if(d.so){const ls=S.orders.filter(o=>o.orderNo===d.so);const v=await inputBox('Số đơn SAP','Số đơn SAP cho '+d.so,ls[0]&&ls[0].so||'');if(v==null)return;
+    try{await api('setSo',d.so,clean(v));toast('Đã lưu số đơn SAP');refreshState()}catch(e){toast('Lỗi: '+errMsg(e),true)}}
+}
+function openBulkSo(){
+  const ov=openModal('<div class="dh">Đóng đơn theo danh sách số đơn SAP</div><div class="db"><div class="small muted" style="margin-bottom:6px">Dán các số đơn đã xuất hàng (mỗi số một dòng, hoặc cách nhau bằng dấu phẩy / khoảng trắng).</div><textarea id="bsTxt" autofocus></textarea><div id="bsRes" style="margin-top:10px"></div></div><div class="df"><button class="btn" data-x>Đóng</button><button class="btn" data-chk>Kiểm tra</button><button class="btn ok" data-go disabled>Đóng các đơn khớp</button></div>',true);
+  let match=[];
+  const chk=()=>{const nums=new Set(ov.querySelector('#bsTxt').value.split(/[\s,;]+/).map(normSo).filter(Boolean));
+    match=S.orders.filter(o=>o.so&&o.so.split(/[\s,;/]+/).some(x=>nums.has(normSo(x))));
+    const found=new Set();match.forEach(o=>o.so.split(/[\s,;/]+/).forEach(x=>{if(nums.has(normSo(x)))found.add(normSo(x))}));
+    const miss=[...nums].filter(n=>!found.has(n));
+    ov.querySelector('#bsRes').innerHTML='<div class="banner info">Khớp <b>'+match.length+'</b> dòng giữ hàng ('+new Set(match.map(o=>o.orderNo)).size+' đơn).'+(miss.length?'<br>Không thấy trong app: '+miss.slice(0,40).map(esc).join(', ')+(miss.length>40?'…':''):'')+'</div>'+
+      (match.length?'<div class="tw" style="max-height:220px"><table><thead><tr><th>Số SAP</th><th>CH</th><th>Mã</th><th>Lô</th><th class="n">SL</th></tr></thead><tbody>'+match.map(o=>'<tr><td>'+esc(o.so)+'</td><td>'+esc(o.ch)+'</td><td>'+esc(o.m)+'</td><td>'+esc(o.b)+'</td><td class="n">'+fmtN(o.qty)+'</td></tr>').join('')+'</tbody></table></div>':'');
+    ov.querySelector('[data-go]').disabled=!match.length||S.canWrite===false};
+  ov.querySelector('[data-chk]').onclick=chk;ov.querySelector('#bsTxt').addEventListener('input',()=>{clearTimeout(ov._t);ov._t=setTimeout(chk,300)});
+  ov.querySelector('[data-x]').onclick=()=>ov.remove();
+  ov.querySelector('[data-go]').onclick=async()=>{const b=ov.querySelector('[data-go]');b.disabled=true;b.textContent='Đang đóng…';await setStatus(match.map(o=>o.id),'xong');ov.remove()};
+}
+function ordersTSV(list){return ['Mã giữ\tCH/khách\tKD\tSố đơn SAP\tMã hàng\tTên hàng\tKho\tKho con\tLô\tSL giữ\tĐVT\tNgày giữ\tGhi chú'].concat(list.map(o=>[o.orderNo,o.ch,o.kd,o.so,o.m,o.d,o.p,o.s,o.b,String(o.qty).replace('.',','),o.u,fmtDT(o.createdAt),o.note].map(clean).join('\t'))).join('\n')}
+
+/* ---------- history ---------- */
+let HIST=[];
+async function loadHistory(){
+  const box=$('#historyTable');if(!S.sess){box.innerHTML='<div class="empty">Chưa đăng nhập.</div>';return}
+  box.innerHTML='<div class="empty">Đang tải…</div>';
+  try{HIST=await api('getHistory');renderHistory()}
+  catch(e){box.innerHTML='<div class="empty">Không tải được lịch sử: '+esc(e&&e.message||e)+'</div>'}
+}
+function renderHistory(){
+  const terms=norm($('#hq').value).split(/\s+/).filter(Boolean);
+  const list=HIST.filter(o=>!terms.length||terms.every(t=>norm([o.orderNo,o.ch,o.kd,o.so,o.m,o.d,o.b].join(' ')).includes(t)));
+  wantNames(list.map(o=>o.closedBy));
+  $('#historyTable').innerHTML=list.length?'<table><thead><tr><th>Kết quả</th><th>Đóng lúc</th><th>Mã giữ</th><th>CH / khách</th><th>KD</th><th>Số SAP</th><th>Mã</th><th>Lô</th><th>Kho</th><th class="n">SL</th><th>Giữ lúc</th><th>Người đóng</th></tr></thead><tbody>'+
+    list.map(o=>'<tr><td>'+(o.status==='xong'?'<span class="pill ok">Xong</span>':'<span class="pill bad">Hủy</span>')+'</td><td>'+esc(fmtDT(o.closedAt))+'</td><td>'+esc(o.orderNo)+'</td><td>'+esc(o.ch)+'</td><td>'+esc(o.kd)+'</td><td>'+esc(o.so)+'</td><td><b>'+esc(o.m)+'</b></td><td>'+esc(o.b)+'</td><td>'+esc(o.p)+(o.s?' / '+esc(o.s):'')+'</td><td class="n">'+fmtN(o.qty)+' '+esc(o.u)+'</td><td>'+esc(fmtDT(o.createdAt))+'</td><td>'+esc(o.closedBy||'')+'</td></tr>').join('')+'</tbody></table>':'<div class="empty">Chưa có lịch sử.</div>';
+}
+/* ---------- global banner / tabs ---------- */
+function renderGlobal(){
+  const g=$('#globalMsg');let h='';
+  if(S.sess&&S.canWrite===false)h='<div class="banner info">Tài khoản <b>chỉ xem</b>: xem được khả dụng nhưng không giữ hàng / đóng đơn.</div>';
+  if(S.offline)h+='<div class="banner warn">Mất kết nối máy chủ – số liệu có thể chưa mới nhất. App sẽ tự thử lại.</div>';
+  g.innerHTML=h;
+  const ub=$('#userBox');ub.innerHTML=S.sess?'<span class="muted">'+esc(S.sess.name)+' · '+esc(S.sess.role)+'</span><button class="btn sm" id="btnReload">Tải lại</button><button class="btn sm" id="btnLogout">Đăng xuất</button>':'';
+  if(S.sess){$('#btnReload').onclick=()=>{loadStock(true);refreshState()};$('#btnLogout').onclick=doLogout}
+}
+function switchTab(t){S.tab=t;document.querySelectorAll('#nav button').forEach(b=>b.classList.toggle('on',b.dataset.tab===t));
+  document.querySelectorAll('main>section').forEach(s=>s.classList.toggle('hide',s.id!=='tab-'+t));
+  if(t==='stock')renderStock();if(t==='orders')renderOrders();if(t==='history')loadHistory();
+  try{localStorage.setItem('tk_tab',t)}catch(e){}}
+function renderAll(){renderSnap();renderGlobal();if(S.tab==='stock')renderStock();if(S.tab==='orders')renderOrders();if(S.tab==='stock'||S.tab==='orders')renderStats()}
+
+/* ---------- events ---------- */
+document.getElementById('nav').addEventListener('click',e=>{const b=e.target.closest('button');if(b)switchTab(b.dataset.tab)});
+let qT=null;$('#q').addEventListener('input',e=>{clearTimeout(qT);qT=setTimeout(()=>{S.view.q=e.target.value;S.view.limit=200;renderStock()},150)});
+$('#fPlant').onchange=e=>{S.view.plant=e.target.value;S.view.limit=200;renderStock()};
+$('#fSloc').onchange=e=>{S.view.sloc=e.target.value;S.view.limit=200;renderStock()};
+$('#onlyAvail').onchange=e=>{S.view.onlyAvail=e.target.checked;renderStock()};
+$('#onlyHeld').onchange=e=>{S.view.onlyHeld=e.target.checked;renderStock()};
+$('#mode').addEventListener('click',e=>{const b=e.target.closest('button');if(!b)return;S.view.mode=b.dataset.m;document.querySelectorAll('#mode button').forEach(x=>x.classList.toggle('on',x===b));renderStock()});
+$('#more').onclick=()=>{S.view.limit+=300;renderStock()};
+$('#stockTable').addEventListener('click',e=>{const th=e.target.closest('th[data-sort]');if(th){const f=th.dataset.sort;if(S.view.sort===f)S.view.dir*=-1;else{S.view.sort=f;S.view.dir=['q','h','a','lots'].includes(f)?-1:1}renderStock();return}
+  const tr=e.target.closest('tr[data-k]');if(!tr)return;
+  if(tr.dataset.mode==='mat'){const [m,p]=tr.dataset.k.split('\u0001');S.view.mode='lot';document.querySelectorAll('#mode button').forEach(x=>x.classList.toggle('on',x.dataset.m==='lot'));
+    $('#q').value=m;S.view.q=m;if(p){$('#fPlant').value=p;S.view.plant=p}renderStock();return}
+  openHold(tr.dataset.k)});
+$('#copyStock').onclick=()=>{const lot=S.view.mode==='lot';const rows=currentRows();const Lb=L();
+  const f=['p'];if(has('n'))f.push('n');f.push('m','d');if(lot)f.push('s');f.push('u');if(lot){if(has('x'))f.push('x');f.push('b')}else f.push('lots');f.push('q');if(has('a0'))f.push('a0');f.push('h','a');if(has('g'))f.push('g');
+  const hd=f.map(k=>k==='lots'?'Số lô':k==='h'?'Tồn có đơn hàng':k==='a'?'Khả dụng':Lb[k]);
+  const num=v=>v==null?'':String(r3(v)).replace('.',',');
+  copyText([hd.join('\t')].concat(rows.map(x=>f.map(k=>['q','a0','h','a'].includes(k)?num(x[k]):clean(x[k])).join('\t'))).join('\n'))};
+$('#cartOpen').onclick=openCart;
+$('#cartClear').onclick=async()=>{if(await confirmBox('Bỏ đơn đang soạn','Bỏ '+S.cart.length+' dòng chưa lưu?','Bỏ',true)){S.cart=[];renderCart();renderStock()}};
+$('#orderList').addEventListener('click',onOrdersClick);$('#reconcile').addEventListener('click',onOrdersClick);
+let oT=null;$('#oq').addEventListener('input',()=>{clearTimeout(oT);oT=setTimeout(renderOrders,150)});
+$('#bulkSo').onclick=openBulkSo;
+$('#copyOrders').onclick=()=>{const terms=norm($('#oq').value).split(/\s+/).filter(Boolean);const list=S.orders.filter(o=>!terms.length||terms.every(t=>norm([o.orderNo,o.ch,o.kd,o.so,o.m,o.d,o.b,o.note].join(' ')).includes(t)));
+  copyText(ordersTSV(groupOrders(list).flatMap(g=>g.ls)))};
+let hT=null;$('#hq').addEventListener('input',()=>{clearTimeout(hT);hT=setTimeout(renderHistory,150)});
+$('#hReload').onclick=loadHistory;
+document.addEventListener('keydown',e=>{if(e.key==='Escape'){const ovs=document.querySelectorAll('#modalRoot .ov');if(ovs.length)ovs[ovs.length-1].remove()}});
+
+/* ---------- server API (Google Apps Script) ---------- */
+function errMsg(e){return String(e&&e.message||e).replace(/^Error:\s*/,'').replace(/^Exception:\s*/,'')}
+const API_URL='https://script.google.com/macros/s/AKfycbw1zTYsOKPKN99DqJ7Zpojy09hxw564lOf4Vp60gorNlLIifSat9PXhwlEDxAKRXxKf/exec';
+function callServer(fn,args){
+  if(window.google&&google.script&&google.script.run){return new Promise((res,rej)=>{google.script.run.withSuccessHandler(res).withFailureHandler(e=>rej(new Error(errMsg(e))))[fn].apply(null,args)})}
+  return fetch(API_URL,{method:'POST',body:JSON.stringify({fn:fn,args:args})})
+    .then(r=>{if(!r.ok)throw new Error('Máy chủ báo lỗi '+r.status);return r.json()})
+    .then(j=>{if(!j||!j.ok)throw new Error((j&&j.error)||'Lỗi không rõ');return j.data})}
+function api(fn,...args){
+  return callServer(fn,fn==='login'?args:[S.sess&&S.sess.token].concat(args))
+    .then(v=>{if(S.offline){S.offline=false;renderGlobal()}return v},
+      e=>{const m=errMsg(e);if(m.indexOf('SESSION_EXPIRED')>=0){sessionExpired();throw new Error('Phiên đăng nhập đã hết hạn, vui lòng đăng nhập lại')}
+        if(/Failed to fetch|NetworkError|Load failed/i.test(m))throw new Error('Không kết nối được máy chủ, kiểm tra mạng rồi thử lại');throw new Error(m)})}
+function showLogin(msg){$('#loginOv').classList.remove('hide');$('#lgErr').textContent=msg||'';setTimeout(()=>$('#lgUser').focus(),50)}
+function sessionExpired(){if(!S.sess)return;S.sess=null;try{localStorage.removeItem('tk_sess')}catch(e){}stopPoll();renderAll();showLogin('Phiên đăng nhập đã hết hạn, vui lòng đăng nhập lại.')}
+async function doLogout(){const t=S.sess&&S.sess.token;S.sess=null;try{localStorage.removeItem('tk_sess')}catch(e){}stopPoll();
+  S.orders=[];S.ordersLoaded=false;rebuildResv();renderAll();showLogin();if(t)callServer('logout',[t]).catch(()=>{})}
+$('#loginForm').addEventListener('submit',async e=>{e.preventDefault();const b=$('#lgBtn');b.disabled=true;b.textContent='Đang đăng nhập…';$('#lgErr').textContent='';
+  try{const s=await api('login',$('#lgUser').value,$('#lgPass').value);startSession(s)}catch(err){$('#lgErr').textContent=errMsg(err)}
+  finally{b.disabled=false;b.textContent='Đăng nhập'}});
+function startSession(s){S.sess=s;S.canWrite=s.role!=='xem';try{localStorage.setItem('tk_sess',JSON.stringify(s))}catch(e){}
+  $('#loginOv').classList.add('hide');$('#lgPass').value='';renderAll();loadStock(false);refreshState();startPoll()}
+let loadingStock=false;
+async function loadStock(force){if(!S.sess||loadingStock)return;loadingStock=true;if(force)toast('Đang tải lại tồn kho…');
+  try{const o=JSON.parse(await api('getStock',!!force));const rows=[];
+    for(const line of String(o.data||'').split('\n')){if(!line)continue;const a=line.split('\t');const mm=(o.mats&&o.mats[a[1]])||['',''];
+      rows.push({p:a[0],n:(o.plants&&o.plants[a[0]])||'',m:a[1],d:mm[0],g:mm[1],s:a[2],x:a[3],b:a[4],u:a[5],q:+a[6]||0,a0:a[7]===''||a[7]==null?null:(+a[7]||0)})}
+    S.meta={sid:o.at,at:o.at,loadedAt:o.loadedAt,date:String(o.at||'').slice(0,10),src:'gsheet',base:'q',cols:['p','n','m','d','s','u','x','b','q','a0','g'],labels:o.labels||{},rows:rows.length};
+    S.stockLu=o.at;S.stock=rows;rebuildStockIndex();S.metaLoaded=true;renderAll();if(force)toast('Đã tải lại tồn kho ('+rows.length.toLocaleString('vi-VN')+' dòng)')}
+  catch(e){S.metaLoaded=true;renderAll();toast('Không tải được tồn kho: '+errMsg(e),true)}
+  finally{loadingStock=false}}
+let stateBusy=false;
+async function refreshState(){if(!S.sess||stateBusy)return;stateBusy=true;
+  try{const st=await api('getState');S.orders=st.orders||[];S.ordersLoaded=true;rebuildResv();
+    if(st.me){S.sess=Object.assign({},S.sess,{name:st.me.name,role:st.me.role});S.canWrite=st.me.role!=='xem'}
+    if(st.stockLu&&S.stockLu&&st.stockLu!==S.stockLu)loadStock(false);
+    renderAll()}
+  catch(e){if(S.sess&&!/hết hạn/.test(errMsg(e))){S.offline=true;renderGlobal()}}
+  finally{stateBusy=false}}
+let pollT=null;
+let stockT=null;
+function startPoll(){stopPoll();pollT=setInterval(()=>{if(!document.hidden)refreshState()},20000);stockT=setInterval(()=>{if(!document.hidden)loadStock(false)},10*60000)}
+function stopPoll(){if(pollT)clearInterval(pollT);if(stockT)clearInterval(stockT);pollT=stockT=null}
+document.addEventListener('visibilitychange',()=>{if(!document.hidden&&S.sess)refreshState()});
+
+/* ---------- boot ---------- */
+renderAll();
+try{const t=localStorage.getItem('tk_tab');if(t&&document.getElementById('tab-'+t))switchTab(t)}catch(e){}
+(function boot(){
+  let saved=null;try{saved=JSON.parse(localStorage.getItem('tk_sess')||'null')}catch(e){}
+  if(saved&&saved.token){S.sess=saved;S.canWrite=saved.role!=='xem';renderAll();
+    api('whoami').then(me=>{startSession(Object.assign({},saved,me))}).catch(()=>{if(!S.sess)return;S.sess=null;renderAll();showLogin()})}
+  else showLogin();
+})();
+})();
+</script>
+</body>
+</html>
