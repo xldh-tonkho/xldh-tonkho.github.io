@@ -151,6 +151,7 @@ table.sap td.av{font-weight:700}
         <input type="search" id="oq" class="grow" placeholder="Lọc theo CH / khách, KD, mã hàng, số đơn SAP, mã giữ hàng…">
         <button class="btn" id="bulkSo">Đóng theo danh sách số đơn SAP</button>
         <button class="btn" id="copyOrders">Sao chép danh sách</button>
+        <button class="btn ok" id="exportRpt">Xuất Excel báo cáo</button>
       </div>
     </div>
     <div id="orderList"></div>
@@ -616,7 +617,7 @@ document.addEventListener('keydown',e=>{if(e.key==='Escape'){const ovs=document.
 
 /* ---------- nhập file đơn chừa ---------- */
 const IMP={mat:null,hdr:0,cols:{},rows:[],plan:[],del:new Set()};
-const IMPF=[['so','Số đơn SAP'],['ch','Khách / CH'],['kd','KD'],['m','Mã hàng *'],['p','Kho (Plant)'],['s','Kho con (SLoc)'],['x','Màu'],['b','Lô (Batch)'],['q','Số lượng *'],['u','ĐVT']];
+const IMPF=[['so','Số đơn SAP'],['ch','Khách / CH'],['kd','KD'],['m','Mã hàng *'],['p','Kho (Plant)'],['s','Kho con (SLoc)'],['x','Màu'],['b','Lô (Batch)'],['q','Số lượng *'],['u','ĐVT'],['sg','Nhóm BH (Sales group)'],['kh','Mã KH']];
 let xlsxP=null;
 function loadXlsx(){if(window.XLSX)return Promise.resolve();if(xlsxP)return xlsxP;
   xlsxP=new Promise((res,rej)=>{const sc=document.createElement('script');sc.src='https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js';sc.onload=()=>res();sc.onerror=()=>{xlsxP=null;rej(new Error('Không tải được bộ đọc Excel'))};document.head.appendChild(sc)});return xlsxP}
@@ -636,6 +637,8 @@ function impDetect(h){const H=h.map(x=>norm(x).replace(/[^a-z0-9 ]/g,' ').replac
   c.x=pick([x=>/^(mau|m)$/.test(x)]);
   c.b=pick([x=>/^(batch|lo|so lo|lo hang)$/.test(x)]);
   c.u=pick([x=>/^(su|sales unit|dvt|don vi|un|bun|uom)$/.test(x)]);
+  c.sg=pick([x=>/^(sales group|nhom ban hang|nhom bh|sales grp|sgrp)$/.test(x)]);
+  c.kh=pick([x=>/^(sold to party|sold to|ma kh|ma khach hang|ma khach|customer|customer number)$/.test(x)]);
   return c}
 function impNum(v){if(typeof v==='number')return v;let s=String(v||'').replace(/\s/g,'');if(!s)return NaN;if(s.includes(',')&&!s.includes('.'))s=/^\d{1,3}(,\d{3})+$/.test(s)?s.replace(/,/g,''):s.replace(',','.');else if(s.includes(',')&&s.includes('.'))s=s.lastIndexOf(',')>s.lastIndexOf('.')?s.replace(/\./g,'').replace(',','.'):s.replace(/,/g,'');else if(/^\d{1,3}(\.\d{3})+$/.test(s))s=s.replace(/\./g,'');return parseFloat(s)}
 function impLoad(mat){mat=mat.map(r=>(r||[]).map(v=>v==null?'':v));let hi=0,c=null;
@@ -644,7 +647,7 @@ function impLoad(mat){mat=mat.map(r=>(r||[]).map(v=>v==null?'':v));let hi=0,c=nu
   IMP.mat=mat;IMP.hdr=hi;IMP.cols=c;IMP.del=new Set();$('#impMapCard').classList.remove('hide');impInit();impRender()}
 function impBuild(){const c=IMP.cols,mat=IMP.mat,dp=$('#impPlant').value,dkd=clean($('#impKD').value);const g=(r,k)=>c[k]>=0?clean(r[c[k]]):'';
   const rows=[];for(let i=IMP.hdr+1;i<mat.length;i++){if(IMP.del.has(i))continue;const r=mat[i];const m=g(r,'m');if(!m)continue;if(/^(tong|total)/.test(norm(m)))continue;
-    const q=impNum(c.q>=0?r[c.q]:'');if(!(q>0))continue;rows.push({i,so:g(r,'so'),ch:g(r,'ch'),kd:g(r,'kd')||dkd,m,p:g(r,'p')||dp,s:g(r,'s'),x:g(r,'x'),b:g(r,'b'),q:r3(q),u:g(r,'u')})}
+    const q=impNum(c.q>=0?r[c.q]:'');if(!(q>0))continue;rows.push({i,sg:g(r,'sg'),kh:g(r,'kh'),so:g(r,'so'),ch:g(r,'ch'),kd:g(r,'kd')||dkd,m,p:g(r,'p')||dp,s:g(r,'s'),x:g(r,'x'),b:g(r,'b'),q:r3(q),u:g(r,'u')})}
   // existing holds -> duplicate detection
   const ex=new Set(S.orders.map(o=>[normSo(o.so),o.m,o.b].join('|')));const exNoB=new Set(S.orders.map(o=>[normSo(o.so),o.m].join('|')));
   const used=new Map();const plan=[];
@@ -679,7 +682,7 @@ function impBtn(){const on=IMP.plan.filter(x=>x.on).length,pr=impProb().length;c
   b.disabled=(!on&&!pr)||S.canWrite===false}
 async function impGo(){const on=IMP.plan.filter(x=>x.on&&x.lines.length);const prob=impProb();if(!on.length&&!prob.length)return;
   if(on.length){const groups=new Map();const note=clean($('#impNote').value);
-    for(const it of on){const r=it.r;const key=(r.so||'')+'|'+(r.ch||'')+'|'+(r.kd||'');if(!groups.has(key))groups.set(key,{ch:r.ch||(r.so?'Đơn '+r.so:'Đơn chừa'),kd:r.kd,so:r.so,note,lines:[]});
+    for(const it of on){const r=it.r;const key=(r.so||'')+'|'+(r.ch||'')+'|'+(r.kd||'');if(!groups.has(key))groups.set(key,{ch:r.ch||(r.so?'Đơn '+r.so:'Đơn chừa'),kd:r.kd,so:r.so,sg:r.sg,kh:r.kh,note,lines:[]});
       const g=groups.get(key);for(const l of it.lines){const x=l.x;g.lines.push({m:x.m,d:x.d,p:x.p,n:x.n,s:x.s,x:x.x,g:x.g,b:x.b,u:x.u||r.u,qty:l.qty})}}
     const orders=[...groups.values()];
     if(!await confirmBox('Giữ hàng từ file','Giữ hàng <b>'+on.length+'</b> dòng'+(on.some(x=>x.st==='part')?' (có '+on.filter(x=>x.st==='part').length+' dòng chỉ giữ một phần = đúng khả dụng)':' OK')+' ('+orders.length+' đơn, '+orders.reduce((a,o)=>a+o.lines.length,0)+' dòng giữ). Khả dụng sẽ bị trừ ngay cho cả nhóm.'+(prob.length?'<div class="small muted" style="margin-top:6px">'+prob.length+' dòng hết hàng / lỗi không giữ – sẽ hỏi xóa ở bước sau.</div>':''),'Giữ hàng'))return;
@@ -700,6 +703,36 @@ $('#impRead').onclick=async()=>{const t=$('#impPaste').value;const f=$('#impFile
   catch(e){$('#impReadMsg').textContent='';toast('Không đọc được: '+errMsg(e),true)}};
 $('#impPlant').onchange=()=>{if(IMP.mat)impRender()};$('#impKD').onchange=()=>{if(IMP.mat)impRender()};
 $('#impGo').onclick=impGo;
+
+/* ---------- xuất Excel báo cáo đơn chừa ---------- */
+async function exportReport(){const b=$('#exportRpt');const old=b.textContent;b.disabled=true;b.textContent='Đang tạo file…';
+  try{await loadXlsx();await refreshState();const dm=await api('getDanhMuc');
+    const nm=x=>String(x||'').split(String.fromCharCode(0x200b)).join('').toLowerCase().replace(/\s+/g,' ').trim();
+    const kvOf={};(dm.kv||[]).forEach(r=>{if(r[0])kvOf[r[0]]=r[1]});const byCode={},byName={};(dm.kh||[]).forEach(r=>{const o={code:r[0],name:r[1],sg:r[2],kd:r[3]};if(r[0])byCode[r[0]]=o;if(r[1]&&!byName[nm(r[1])])byName[nm(r[1])]=o});
+    const L=S.orders.filter(o=>o.status==='giu'||!o.status).map(o=>{const c=(o.kh&&byCode[o.kh])||byName[nm(o.ch)]||{};const sg=o.sg||c.sg||'';
+      return {kv:(sg&&kvOf[sg])||(sg?'Nhóm BH '+sg:'Chưa phân KV'),sg,kd:o.kd||c.kd||'Chưa phân KD',by:o.createdBy||'',kh:o.kh||c.code||'',ch:o.ch||'',so:o.so||'',no:o.orderNo,m:o.m,d:o.d,p:o.p,n:o.n||'',s:o.s,x:o.x,b:o.b,u:o.u||'',q:+o.qty||0,note:o.note||''}});
+    if(!L.length){toast('Không có đơn đang giữ để xuất',true);return}
+    const units=Object.entries(L.reduce((a,x)=>(a[x.u]=(a[x.u]||0)+1,a),{})).sort((a,b)=>b[1]-a[1]).map(x=>x[0]);
+    const now=new Date();const ts=pad(now.getDate())+'/'+pad(now.getMonth()+1)+'/'+now.getFullYear()+' '+pad(now.getHours())+':'+pad(now.getMinutes());
+    const cmp=(a,b)=>String(a).localeCompare(String(b),'vi',{numeric:true});
+    const agg=(keys,extra)=>{const m=new Map();for(const x of L){const k=keys.map(f=>x[f]).join('|');let g=m.get(k);if(!g){g={v:keys.map(f=>x[f]),don:new Set(),ch:new Set(),ma:new Set(),n:0,u:{}};m.set(k,g)}
+        g.don.add(x.so||x.no);g.ch.add(x.ch);g.ma.add(x.m);g.n++;g.u[x.u]=r3((g.u[x.u]||0)+x.q)}
+      return [...m.values()].sort((a,b)=>{for(let i=0;i<a.v.length;i++){const c=cmp(a.v[i],b.v[i]);if(c)return c}return 0}).map(g=>[...g.v,g.don.size,...(extra.includes('ch')?[g.ch.size]:[]),g.ma.size,g.n,...units.map(u=>g.u[u]||'')])};
+    const uh=units.map(u=>'SL ('+(u||'—')+')');
+    const tbl=(title,hdr,rows)=>{const tot=['TỔNG',...hdr.slice(1).map(()=>'')];const ws=XLSX.utils.aoa_to_sheet([[title],['Xuất lúc '+ts+' · chỉ tính hàng đang giữ trong app'],[],hdr,...rows]);
+      ws['!autofilter']={ref:XLSX.utils.encode_range({s:{r:3,c:0},e:{r:3+rows.length,c:hdr.length-1}})};ws['!cols']=hdr.map((h,i)=>({wch:Math.min(48,Math.max(String(h).length+2,...rows.slice(0,400).map(r=>String(r[i]==null?'':r[i]).length+1)))}));return ws};
+    const wb=XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb,tbl('ĐƠN CHỪA THEO KHU VỰC',['Khu vực (KV)','Số đơn','Số cửa hàng','Số mã hàng','Số dòng',...uh],agg(['kv'],['ch'])),'Theo KV');
+    XLSX.utils.book_append_sheet(wb,tbl('ĐƠN CHỪA THEO KD',['Khu vực (KV)','KD / SR','Số đơn','Số cửa hàng','Số mã hàng','Số dòng',...uh],agg(['kv','kd'],['ch'])),'Theo KD');
+    XLSX.utils.book_append_sheet(wb,tbl('ĐƠN CHỪA THEO NGƯỜI CHỪA',['Người chừa (người giữ hàng)','Số đơn','Số cửa hàng','Số mã hàng','Số dòng',...uh],agg(['by'],['ch'])),'Theo người chừa');
+    XLSX.utils.book_append_sheet(wb,tbl('ĐƠN CHỪA THEO CỬA HÀNG',['Khu vực (KV)','KD / SR','Mã KH','Cửa hàng / khách','Số đơn','Số mã hàng','Số dòng',...uh],agg(['kv','kd','kh','ch'],[])),'Theo cửa hàng');
+    const det=L.slice().sort((a,b)=>cmp(a.kv,b.kv)||cmp(a.kd,b.kd)||cmp(a.ch,b.ch)||cmp(a.so,b.so)||cmp(a.m,b.m)).map(x=>[x.kv,x.sg,x.kd,x.by,x.kh,x.ch,x.so,x.no,x.m,x.d,x.p,x.n,x.s,x.x,x.b,x.u,x.q,x.note]);
+    XLSX.utils.book_append_sheet(wb,tbl('CHI TIẾT ĐƠN CHỪA',['Khu vực (KV)','Nhóm BH','KD / SR','Người chừa','Mã KH','Cửa hàng / khách','Số đơn SAP','Mã giữ (app)','Mã hàng','Tên hàng','Kho','Tên kho','Kho con','Màu','Lô','ĐVT','SL giữ','Ghi chú'],det),'Chi tiết');
+    const fn='BaoCao_DonChua_'+pad(now.getDate())+pad(now.getMonth()+1)+now.getFullYear()+'_'+pad(now.getHours())+pad(now.getMinutes())+'.xlsx';
+    XLSX.writeFile(wb,fn);const nKV=L.filter(x=>x.kv==='Chưa phân KV').length,nKD=L.filter(x=>x.kd==='Chưa phân KD').length;
+    toast('Đã xuất '+fn+' ('+L.length+' dòng)'+((nKV||nKD)?' – '+nKD+' dòng chưa phân KD'+(nKV?', '+nKV+' dòng chưa phân KV':'')+' (điền ở trang DM_KH / DM_KV)':''),!!(nKV||nKD))}
+  catch(e){toast('Lỗi xuất Excel: '+errMsg(e),true)}finally{b.disabled=false;b.textContent=old}}
+$('#exportRpt').onclick=exportReport;
 
 /* ---------- server API (Google Apps Script) ---------- */
 function errMsg(e){return String(e&&e.message||e).replace(/^Error:\s*/,'').replace(/^Exception:\s*/,'')}
