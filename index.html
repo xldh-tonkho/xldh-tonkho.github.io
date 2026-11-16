@@ -198,7 +198,7 @@ table.sap td.av{font-weight:700}
       <p><b>Khả dụng = Hàng có sẵn − Tồn có đơn hàng</b>, tính riêng cho từng Plant × Mat. × Stor. Loc. × Màu × Batch.</p>
       <ul>
         <li><b>Hàng có sẵn</b>: đọc thẳng từ Google Sheet “Thông tin tồn kho”. App tự đọc lại mỗi 10 phút; vừa cập nhật Sheet xong muốn thấy ngay thì bấm <b>Tải lại</b> (góc trên bên phải).</li>
-        <li><b>Tồn có đơn hàng</b>: tổng các đơn XLĐH đang giữ trong app (lưu ở trang <b>DonGiu</b> của file app). <b>Bấm vào số này</b> để xem ai đang giữ: người giữ, KD, CH / khách, số đơn SAP, số lượng, ngày giữ.</li>
+        <li><b>Tồn có đơn hàng</b>: tổng các đơn XLĐH đang giữ trong app (lưu ở trang <b>DonGiu</b> của file app). App <b>chỉ cho giữ tối đa bằng khả dụng</b>: nhập vượt thì tự giảm về đúng khả dụng. Nếu tồn cập nhật giảm làm lô bị âm, bấm <b>Điều chỉnh về đúng khả dụng</b> (ô “dòng khả dụng âm”): app giảm đơn giữ mới nhất trước, giảm hết thì chuyển Hủy. <b>Bấm vào số này</b> để xem ai đang giữ: người giữ, KD, CH / khách, số đơn SAP, số lượng, ngày giữ.</li>
         <li>Cột “Khả dụng SAP” chỉ để tham khảo.</li>
       </ul>
       <h3>Khi có đơn · Giữ hàng</h3>
@@ -211,7 +211,7 @@ table.sap td.av{font-weight:700}
       <ol>
         <li>Tab <b>Nhập đơn chừa</b> → chọn file Excel / CSV (ví dụ xuất VA05) hoặc dán bảng → <b>Đọc dữ liệu</b>.</li>
         <li>Kiểm tra cột app tự nhận (sai thì chọn lại), chọn kho / KD mặc định nếu file thiếu.</li>
-        <li>Xem bảng trạng thái: <b>OK</b>, <b>Thiếu hàng</b> (không đủ / hết khả dụng), <b>Đã có</b> (đã giữ trước đó – tự bỏ qua), <b>Lỗi</b> (không thấy mã/lô trong tồn). Bấm <b>Giữ hàng</b>: chỉ dòng <b>OK</b> được giữ; sau đó app liệt kê dòng thiếu hàng / lỗi và hỏi <b>có xóa khỏi danh sách không</b>. Muốn vẫn giữ dòng thiếu hàng (hàng sắp về) thì tick tay dòng đó trước khi bấm.</li>
+        <li>Xem bảng trạng thái: <b>OK</b>, <b>Giữ một phần</b> (không đủ hàng – chỉ giữ đúng số khả dụng), <b>Hết hàng</b> (khả dụng 0 – không giữ), <b>Đã có</b> (đã giữ trước đó – tự bỏ qua), <b>Lỗi</b> (không thấy mã/lô trong tồn). Bấm <b>Giữ hàng</b>: dòng OK giữ đủ, dòng thiếu chỉ giữ đúng khả dụng; sau đó app liệt kê dòng hết hàng / lỗi và hỏi <b>có xóa khỏi danh sách không</b>.</li>
       </ol>
       <h3>Khi hàng đã xuất / khách hủy · Đóng đơn</h3>
       <ol>
@@ -345,8 +345,19 @@ function renderStats(){
   st.innerHTML='<div class="stat"><b>'+mats.toLocaleString('vi-VN')+'</b><span>mã hàng</span></div>'+
     '<div class="stat"><b>'+S.stock.length.toLocaleString('vi-VN')+'</b><span>dòng mã × kho × lô</span></div>'+
     '<div class="stat"><b>'+ord+'</b><span>đơn đang giữ ('+S.orders.length+' dòng)</span></div>'+
-    '<div class="stat"><b style="color:'+(neg?'var(--bad)':'inherit')+'">'+neg+'</b><span>dòng khả dụng âm</span></div>';
+    '<div class="stat"><b style="color:'+(neg?'var(--bad)':'inherit')+'">'+neg+'</b><span>dòng khả dụng âm</span>'+(neg&&S.canWrite!==false?'<button class="btn sm bad" id="btnFixNeg" style="margin-top:6px">Điều chỉnh về đúng khả dụng</button>':'')+'</div>';
+  const fb=$('#btnFixNeg');if(fb)fb.onclick=fixNeg;
 }
+function negPlan(){const out=[];for(const [k,x] of S.resv){const base=Math.max(0,baseOf(S.stockByKey.get(k)));let ex=r3(x.q-base);if(ex<=0.0005)continue;
+    const list=x.list.slice().sort((a,b)=>String(b.createdAt).localeCompare(String(a.createdAt)));
+    for(const o of list){if(ex<=0.0005)break;const to=o.qty<=ex+0.0005?0:r3(o.qty-ex);ex=r3(ex-(o.qty-to));out.push({o,to})}}return out}
+async function fixNeg(){const pl=negPlan();if(!pl.length){toast('Không có đơn nào làm khả dụng âm');return}
+  const nH=pl.filter(x=>x.to===0).length;const show=pl.slice(0,300);
+  const tb='<div class="tw" style="max-height:340px;margin:8px 0"><table><thead><tr><th>Mã giữ</th><th>Người giữ</th><th>CH / khách</th><th>Mã</th><th>Kho</th><th>Lô</th><th class="n">Đang giữ</th><th class="n">Còn giữ</th></tr></thead><tbody>'+
+    show.map(({o,to})=>'<tr><td>'+esc(o.orderNo)+'</td><td>'+esc(o.createdBy)+'</td><td>'+esc(o.ch)+'</td><td><b>'+esc(o.m)+'</b></td><td>'+esc(o.p)+'</td><td>'+esc(o.b)+'</td><td class="n">'+fmtN(o.qty)+'</td><td class="n">'+(to?fmtN(to):'<span class="pill bad">Hủy</span>')+'</td></tr>').join('')+'</tbody></table></div>'+(pl.length>show.length?'<div class="small muted">… và '+(pl.length-show.length)+' dòng nữa</div>':'');
+  if(!await confirmBox('Điều chỉnh đơn giữ về đúng khả dụng','Ở lô bị âm, app <b>giảm đơn giữ mới nhất trước</b> cho tới khi khả dụng về 0. Sẽ chỉnh <b>'+pl.length+'</b> dòng: <b>'+(pl.length-nH)+'</b> dòng giảm số lượng, <b>'+nH+'</b> dòng chuyển <b>Hủy</b> (có ghi chú lý do).'+tb,'Điều chỉnh',true,'Thôi',true))return;
+  toast('Đang điều chỉnh…');
+  try{const ch=await api('fixNegative');await refreshState();toast('Đã điều chỉnh '+ch.length+' dòng về đúng khả dụng')}catch(e){toast('Lỗi: '+errMsg(e),true)}}
 
 function thS(f,label,num){const V=S.view;const ar=V.sort===f?(V.dir>0?' ▲':' ▼'):'';return '<th class="s'+(num?' n':'')+'" data-sort="'+f+'">'+label+ar+'</th>'}
 function renderStock(){
@@ -419,9 +430,11 @@ function openHold(k){
   ov.querySelector('[data-x]').onclick=()=>ov.remove();
   if(ro)return;
   const inp=ov.querySelector('#hQty'),warn=ov.querySelector('#hWarn');
-  const chk=()=>{const v=+inp.value;warn.innerHTML=v>a+0.0005?'<div class="banner warn">Vượt khả dụng '+fmtN(v-a)+' '+esc(r.u)+'. Vẫn thêm được nếu chắc chắn (ví dụ hàng sắp nhập).</div>':''};
+  const chk=()=>{const v=+inp.value;warn.innerHTML=v>a+0.0005?'<div class="banner warn">'+(a>0.0005?'Vượt khả dụng – app <b>chỉ giữ '+fmtN(a)+' '+esc(r.u)+'</b> (đúng khả dụng).':'Lô này <b>hết khả dụng</b> – không giữ được.')+'</div>':''};
   inp.addEventListener('input',chk);
-  const add=()=>{const v=r3(+inp.value);if(!(v>0)){inp.focus();toast('Nhập số lượng lớn hơn 0',true);return}
+  const add=()=>{let v=r3(+inp.value);if(!(v>0)){inp.focus();toast('Nhập số lượng lớn hơn 0',true);return}
+    if(a<=0.0005){toast('Lô này hết khả dụng – không giữ được',true);return}
+    if(v>a+0.0005){toast('Vượt khả dụng – chỉ giữ '+fmtN(a)+' '+r.u,true);v=r3(a)}
     S.cart.push({k,m:r.m,d:r.d,p:r.p,n:r.n||'',s:r.s,x:r.x||'',g:r.g||'',b:r.b,u:r.u,qty:v});ov.remove();renderCart();renderStock();toast('Đã thêm '+fmtN(v)+' '+r.u+' · '+r.m+' vào đơn')};
   inp.addEventListener('keydown',e=>{if(e.key==='Enter')add()});ov.querySelector('[data-add]').onclick=add;
 }
@@ -443,11 +456,11 @@ function openCart(){
     const fc=ov.querySelector('#cForce');if(fc)force=fc.checked;
     const used=new Map();let warn=[];
     let h='<table><thead><tr><th>Mã</th><th>Tên hàng</th><th>Kho</th><th>Lô</th><th class="n">Khả dụng</th><th class="n">SL giữ</th><th></th></tr></thead><tbody>';
-    S.cart.forEach((c,i)=>{const prev=used.get(c.k)||0;const a=r3(availOf(c.k)-prev);used.set(c.k,prev+c.qty);if(c.qty>a+0.0005)warn.push(c.m+' lô '+(c.b||'—')+' vượt '+fmtN(c.qty-a)+' '+c.u);
+    S.cart.forEach((c,i)=>{const prev=used.get(c.k)||0;const a=r3(availOf(c.k)-prev);used.set(c.k,prev+c.qty);if(c.qty>a+0.0005)warn.push(c.m+' lô '+(c.b||'—')+': '+(a>0.0005?'chỉ giữ '+fmtN(a)+' / '+fmtN(c.qty):'hết khả dụng – bỏ dòng này')+' '+c.u);
       h+='<tr><td><b>'+esc(c.m)+'</b></td><td class="desc">'+esc(c.d)+'</td><td>'+esc(c.p)+(c.s?' / '+esc(c.s):'')+'</td><td>'+esc(c.b)+(c.x?' · '+esc(c.x):'')+'</td><td class="n av '+avCls(a)+'">'+fmtN(a)+'</td>'+
       '<td class="n"><input type="number" step="any" min="0" data-q="'+i+'" value="'+c.qty+'" style="width:100px;text-align:right"> '+esc(c.u)+'</td><td><button class="btn sm bad" data-del="'+i+'">Xóa</button></td></tr>'});
     h+='</tbody></table>';ov.querySelector('#cLines').innerHTML=h;
-    ov.querySelector('#cWarn').innerHTML=warn.length?'<div class="banner warn"><b>Vượt khả dụng:</b> '+warn.map(esc).join('; ')+'<br><label class="chk" style="margin-top:6px"><input type="checkbox" id="cForce"'+(force?' checked':'')+'> Tôi đã kiểm tra, vẫn giữ hàng</label></div>':'';
+    ov.querySelector('#cWarn').innerHTML=warn.length?'<div class="banner warn"><b>Vượt khả dụng – app chỉ giữ đúng số khả dụng:</b> '+warn.map(esc).join('; ')+'</div>':'';
     ov.querySelectorAll('[data-del]').forEach(b=>b.onclick=()=>{S.cart.splice(+b.dataset.del,1);renderCart();renderStock();if(!S.cart.length){ov.remove();return}lines()});
     ov.querySelectorAll('[data-q]').forEach(inp=>inp.onchange=()=>{const v=r3(+inp.value);if(v>0){S.cart[+inp.dataset.q].qty=v}lines();renderStock()});
     return warn.length;
@@ -458,19 +471,20 @@ function openCart(){
   saveBtn.onclick=async()=>{
     const ch=clean(ov.querySelector('#cCH').value),kd=clean(ov.querySelector('#cKD').value),so=clean(ov.querySelector('#cSO').value),note=clean(ov.querySelector('#cNote').value);
     if(!ch){toast('Nhập CH / khách đặt',true);ov.querySelector('#cCH').focus();return}
-    const w=lines();if(w&&!force){toast('Có dòng vượt khả dụng – tick xác nhận hoặc sửa số lượng',true);return}
+    lines();
     saveBtn.disabled=true;saveBtn.textContent='Đang lưu…';
     let orderNo='';
     const now=new Date().toISOString();let ok=0;
     try{
       for(let i=0;i<S.cart.length;i++){const c=S.cart[i];
         }
-      const res=await api('addOrder',{ch,kd,so,note,force:!!force,lines:S.cart.map(c=>({m:c.m,d:c.d,p:c.p,n:c.n,s:c.s,x:c.x,g:c.g,b:c.b,u:c.u,qty:c.qty}))});ok=S.cart.length;orderNo=res.orderNo;refreshState();
+      const res=await api('addOrder',{ch,kd,so,note,lines:S.cart.map(c=>({m:c.m,d:c.d,p:c.p,n:c.n,s:c.s,x:c.x,g:c.g,b:c.b,u:c.u,qty:c.qty}))});ok=res.lines;orderNo=res.orderNo;const cutTxt=(res.cut&&res.cut.length)?' – giảm theo khả dụng: '+res.cut.map(c=>c.m+' lô '+(c.b||'—')+' '+fmtN(c.got)+'/'+fmtN(c.want)).join('; '):'';refreshState();
       try{const sv=JSON.parse(localStorage.getItem('tk_names')||'{}');sv.ch=[...new Set([ch,...(sv.ch||[])])].slice(0,200);if(kd)sv.kd=[...new Set([kd,...(sv.kd||[])])].slice(0,100);localStorage.setItem('tk_names',JSON.stringify(sv));localStorage.setItem('tk_last',JSON.stringify({kd}))}catch(e){}
-      S.cart=[];renderCart();ov.remove();toast('Đã giữ hàng · '+orderNo+' ('+ok+' dòng)');
+      S.cart=[];renderCart();ov.remove();toast('Đã giữ hàng · '+orderNo+' ('+ok+' dòng)'+cutTxt,!!cutTxt);
     }catch(e){handleWriteErr(e);renderCart();saveBtn.disabled=false;saveBtn.textContent='Lưu giữ hàng';
       const m=errMsg(e);
-      if(m.indexOf('VUOT_KHA_DUNG')>=0){await refreshState();lines();
+      if(m.indexOf('HET_KHA_DUNG')>=0){await refreshState();lines();toast('Không giữ được – các dòng đã hết khả dụng',true)}
+      else if(m.indexOf('VUOT_KHA_DUNG')>=0){await refreshState();lines();
         ov.querySelector('#cWarn').insertAdjacentHTML('afterbegin','<div class="banner bad"><b>Chưa lưu – người khác vừa giữ hàng trước:</b> '+esc(m.replace(/^.*VUOT_KHA_DUNG:\s*/,''))+'.<br>Sửa lại số lượng, hoặc tick “vẫn giữ hàng” nếu chắc chắn.</div>');
         toast('Khả dụng vừa thay đổi – kiểm tra lại số lượng',true)}
       else{toast('Lưu lỗi: '+m,true);lines()}}
@@ -640,42 +654,42 @@ function impBuild(){const c=IMP.cols,mat=IMP.mat,dp=$('#impPlant').value,dkd=cle
     let cand=S.stock.filter(x=>x.m===r.m&&x.p===r.p&&(!r.b||x.b===r.b)&&(!r.s||x.s===r.s)&&(!r.x||x.x===r.x));
     if(!cand.length){it.st='bad';it.msg=r.b?'Không thấy lô này trong tồn':'Không thấy mã ở kho này';it.on=false;continue}
     const av=x=>r3(availOf(x.k)-(used.get(x.k)||0));
-    if(r.b){const x=cand.sort((a,b)=>av(b)-av(a))[0];const a=av(x);it.lines.push({x,qty:r.q});
-      if(r.q>a+0.0005){it.st='warn';it.on=false;it.msg=(a>0.0005?'Không đủ hàng: lô còn '+fmtN(a):'Hết hàng – lô khả dụng 0')+', cần '+fmtN(r.q)}
-      else used.set(x.k,(used.get(x.k)||0)+r.q)}
+    if(r.b){const x=cand.sort((a,b)=>av(b)-av(a))[0];const a=av(x);
+      if(a<=0.0005){it.st='warn';it.on=false;it.msg='Hết hàng – lô khả dụng 0, cần '+fmtN(r.q);it.lines.push({x,qty:r.q})}
+      else{const t=r3(Math.min(a,r.q));it.lines.push({x,qty:t});used.set(x.k,(used.get(x.k)||0)+t);if(r.q>a+0.0005){it.st='part';it.msg='Chỉ giữ '+fmtN(t)+' / '+fmtN(r.q)+' (đúng khả dụng, thiếu '+fmtN(r3(r.q-t))+')'}}}
     else{cand.sort((a,b)=>String(a.b).localeCompare(String(b.b),'vi',{numeric:true}));const tot=r3(cand.reduce((t,x)=>t+Math.max(av(x),0),0));
       const fill=keep=>{let need=r.q;for(const x of cand){if(need<=0.0005)break;const a=av(x);if(a<=0.0005)continue;const t=r3(Math.min(a,need));it.lines.push({x,qty:t});if(keep)used.set(x.k,(used.get(x.k)||0)+t);need=r3(need-t)}return need};
-      if(r.q>tot+0.0005){it.st='warn';it.on=false;it.msg=(tot>0.0005?'Không đủ hàng: còn '+fmtN(tot):'Hết hàng – khả dụng 0')+', cần '+fmtN(r.q);
-        const need=fill(false);if(need>0.0005){const x=it.lines.length?it.lines[it.lines.length-1].x:cand[0];const l=it.lines.find(l=>l.x===x);if(l)l.qty=r3(l.qty+need);else it.lines.push({x,qty:need})}}
-      else{fill(true);if(it.lines.length>1)it.msg='Chia '+it.lines.length+' lô'}}}
+      if(tot<=0.0005){it.st='warn';it.on=false;it.msg='Hết hàng – khả dụng 0, cần '+fmtN(r.q);it.lines.push({x:cand[0],qty:r.q})}
+      else{fill(true);if(r.q>tot+0.0005){it.st='part';it.msg='Chỉ giữ '+fmtN(tot)+' / '+fmtN(r.q)+' (đúng khả dụng, thiếu '+fmtN(r3(r.q-tot))+')'+(it.lines.length>1?' · chia '+it.lines.length+' lô':'')}
+        else if(it.lines.length>1)it.msg='Chia '+it.lines.length+' lô'}}}
   IMP.plan=plan}
 function impRender(){const hdr=IMP.mat[IMP.hdr]||[];const opts=sel=>'<option value="-1">— không có —</option>'+hdr.map((h,i)=>'<option value="'+i+'"'+(i===sel?' selected':'')+'>'+esc(h||('Cột '+(i+1)))+'</option>').join('');
   $('#impMap').innerHTML=IMPF.map(([k,l])=>'<label class="fld" style="margin:0"><span>'+l+'</span><select data-ic="'+k+'">'+opts(IMP.cols[k])+'</select></label>').join('');
   $('#impMap').querySelectorAll('select').forEach(sl=>sl.onchange=()=>{IMP.cols[sl.dataset.ic]=+sl.value;impRender()});
   impBuild();const P=IMP.plan;const cnt=k=>P.filter(x=>x.st===k).length;const on=P.filter(x=>x.on);
-  $('#impSum').innerHTML='<div class="banner info">Đọc được <b>'+P.length+'</b> dòng: <b>'+cnt('ok')+'</b> hợp lệ, <b>'+cnt('warn')+'</b> thiếu hàng / hết hàng, <b>'+cnt('dup')+'</b> đã có trong app (bỏ qua), <b>'+cnt('bad')+'</b> không khớp tồn. Sẽ giữ hàng <b>'+on.length+'</b> dòng ('+new Set(on.map(x=>x.r.so||x.r.ch||'?')).size+' đơn).'+((cnt('warn')+cnt('bad'))?' Dòng thiếu hàng / lỗi không giữ – bấm nút bên dưới, app sẽ hỏi có xóa khỏi danh sách không.':'')+'</div>';
-  const pill={ok:'<span class="pill ok">OK</span>',warn:'<span class="pill warn">Thiếu hàng</span>',dup:'<span class="pill info">Đã có</span>',bad:'<span class="pill bad">Lỗi</span>'};
+  $('#impSum').innerHTML='<div class="banner info">Đọc được <b>'+P.length+'</b> dòng: <b>'+cnt('ok')+'</b> hợp lệ, <b>'+cnt('part')+'</b> chỉ giữ được một phần (đúng khả dụng), <b>'+cnt('warn')+'</b> hết hàng, <b>'+cnt('dup')+'</b> đã có trong app (bỏ qua), <b>'+cnt('bad')+'</b> không khớp tồn. Sẽ giữ hàng <b>'+on.length+'</b> dòng ('+new Set(on.map(x=>x.r.so||x.r.ch||'?')).size+' đơn).'+((cnt('warn')+cnt('bad'))?' Dòng hết hàng / lỗi không giữ – bấm nút bên dưới, app sẽ hỏi có xóa khỏi danh sách không.':'')+'</div>';
+  const pill={ok:'<span class="pill ok">OK</span>',warn:'<span class="pill bad">Hết hàng</span>',part:'<span class="pill warn">Giữ một phần</span>',dup:'<span class="pill info">Đã có</span>',bad:'<span class="pill bad">Lỗi</span>'};
   $('#impPrev').innerHTML='<table><thead><tr><th></th><th>Trạng thái</th><th>Số SAP</th><th>Khách / CH</th><th>KD</th><th>Mã</th><th>Kho</th><th>Lô sẽ giữ</th><th class="n">SL</th><th>Ghi chú</th></tr></thead><tbody>'+
-    P.map((it,i)=>'<tr><td><input type="checkbox" data-ii="'+i+'"'+(it.on?' checked':'')+(it.st==='bad'?' disabled':'')+'></td><td>'+pill[it.st]+'</td><td>'+esc(it.r.so)+'</td><td>'+esc(it.r.ch)+'</td><td>'+esc(it.r.kd)+'</td><td><b>'+esc(it.r.m)+'</b></td><td>'+esc(it.r.p)+'</td><td>'+(it.lines.map(l=>esc(l.x.b)+(l.x.x?' ('+esc(l.x.x)+')':'')+(it.lines.length>1?': '+fmtN(l.qty):'')).join('<br>')||esc(it.r.b))+'</td><td class="n">'+fmtN(it.r.q)+'</td><td class="small">'+esc(it.msg)+'</td></tr>').join('')+'</tbody></table>';
+    P.map((it,i)=>'<tr><td><input type="checkbox" data-ii="'+i+'"'+(it.on?' checked':'')+(it.st==='bad'||it.st==='warn'?' disabled':'')+'></td><td>'+pill[it.st]+'</td><td>'+esc(it.r.so)+'</td><td>'+esc(it.r.ch)+'</td><td>'+esc(it.r.kd)+'</td><td><b>'+esc(it.r.m)+'</b></td><td>'+esc(it.r.p)+'</td><td>'+(it.lines.map(l=>esc(l.x.b)+(l.x.x?' ('+esc(l.x.x)+')':'')+(it.lines.length>1?': '+fmtN(l.qty):'')).join('<br>')||esc(it.r.b))+'</td><td class="n">'+fmtN(it.r.q)+'</td><td class="small">'+esc(it.msg)+'</td></tr>').join('')+'</tbody></table>';
   $('#impPrev').querySelectorAll('[data-ii]').forEach(cb=>cb.onchange=()=>{IMP.plan[+cb.dataset.ii].on=cb.checked;impBtn()});
   impBtn()}
 function impProb(){return IMP.plan.filter(x=>(x.st==='bad'||x.st==='warn')&&!x.on)}
 function impBtn(){const on=IMP.plan.filter(x=>x.on).length,pr=impProb().length;const b=$('#impGo');
-  const f=IMP.plan.filter(x=>x.on&&x.st==='warn').length;b.textContent=on?'Giữ hàng '+on+' dòng'+(f?' (có '+f+' dòng thiếu hàng tick tay)':' OK')+(pr?' · hỏi xóa '+pr+' dòng lỗi':''):(pr?'Xử lý '+pr+' dòng lỗi / thiếu hàng':'Giữ hàng');
+  b.textContent=on?'Giữ hàng '+on+' dòng'+(pr?' · hỏi xóa '+pr+' dòng lỗi / hết hàng':''):(pr?'Xử lý '+pr+' dòng lỗi / hết hàng':'Giữ hàng');
   b.disabled=(!on&&!pr)||S.canWrite===false}
 async function impGo(){const on=IMP.plan.filter(x=>x.on&&x.lines.length);const prob=impProb();if(!on.length&&!prob.length)return;
   if(on.length){const groups=new Map();const note=clean($('#impNote').value);
-    for(const it of on){const r=it.r;const f=it.st==='warn';const key=(r.so||'')+'|'+(r.ch||'')+'|'+(r.kd||'')+'|'+f;if(!groups.has(key))groups.set(key,{ch:r.ch||(r.so?'Đơn '+r.so:'Đơn chừa'),kd:r.kd,so:r.so,note,force:f,lines:[]});
+    for(const it of on){const r=it.r;const key=(r.so||'')+'|'+(r.ch||'')+'|'+(r.kd||'');if(!groups.has(key))groups.set(key,{ch:r.ch||(r.so?'Đơn '+r.so:'Đơn chừa'),kd:r.kd,so:r.so,note,lines:[]});
       const g=groups.get(key);for(const l of it.lines){const x=l.x;g.lines.push({m:x.m,d:x.d,p:x.p,n:x.n,s:x.s,x:x.x,g:x.g,b:x.b,u:x.u||r.u,qty:l.qty})}}
     const orders=[...groups.values()];
-    if(!await confirmBox('Giữ hàng từ file','Giữ hàng <b>'+on.length+'</b> dòng'+(on.some(x=>x.st==='warn')?' (gồm dòng thiếu hàng bạn tick tay)':' OK')+' ('+orders.length+' đơn, '+orders.reduce((a,o)=>a+o.lines.length,0)+' dòng giữ). Khả dụng sẽ bị trừ ngay cho cả nhóm.'+(prob.length?'<div class="small muted" style="margin-top:6px">'+prob.length+' dòng thiếu hàng / lỗi không giữ – sẽ hỏi xóa ở bước sau.</div>':''),'Giữ hàng'))return;
+    if(!await confirmBox('Giữ hàng từ file','Giữ hàng <b>'+on.length+'</b> dòng'+(on.some(x=>x.st==='part')?' (có '+on.filter(x=>x.st==='part').length+' dòng chỉ giữ một phần = đúng khả dụng)':' OK')+' ('+orders.length+' đơn, '+orders.reduce((a,o)=>a+o.lines.length,0)+' dòng giữ). Khả dụng sẽ bị trừ ngay cho cả nhóm.'+(prob.length?'<div class="small muted" style="margin-top:6px">'+prob.length+' dòng hết hàng / lỗi không giữ – sẽ hỏi xóa ở bước sau.</div>':''),'Giữ hàng'))return;
     const b=$('#impGo');b.disabled=true;b.textContent='Đang lưu…';
-    try{const res=await api('importOrders',orders);on.forEach(it=>IMP.del.add(it.r.i));await refreshState();toast('Đã giữ hàng '+res.orders+' đơn ('+res.lines+' dòng) từ file')}
-    catch(e){const m=errMsg(e);if(m.indexOf('VUOT_KHA_DUNG')>=0){await refreshState();impRender();toast('Chưa lưu – người khác vừa giữ hàng trước. App đã tính lại khả dụng, kiểm tra rồi bấm lại.',true)}else{impRender();toast('Lỗi: '+m,true)}return}}
+    try{const res=await api('importOrders',orders);on.forEach(it=>IMP.del.add(it.r.i));await refreshState();toast('Đã giữ hàng '+res.orders+' đơn ('+res.lines+' dòng) từ file'+((res.cut&&res.cut.length)?' – '+res.cut.length+' dòng bị giảm theo khả dụng mới nhất':''))}
+    catch(e){const m=errMsg(e);if(m.indexOf('HET_KHA_DUNG')>=0||m.indexOf('VUOT_KHA_DUNG')>=0){await refreshState();impRender();toast('Chưa lưu – người khác vừa giữ hàng trước. App đã tính lại khả dụng, kiểm tra rồi bấm lại.',true)}else{impRender();toast('Lỗi: '+m,true)}return}}
   impRender();
   if(prob.length){const tb='<div class="tw" style="max-height:300px;margin:8px 0"><table><thead><tr><th>Số SAP</th><th>Khách / CH</th><th>Mã</th><th>Kho</th><th>Lô</th><th class="n">SL</th><th>Lý do</th></tr></thead><tbody>'+
       prob.map(it=>'<tr><td>'+esc(it.r.so)+'</td><td>'+esc(it.r.ch)+'</td><td><b>'+esc(it.r.m)+'</b></td><td>'+esc(it.r.p)+'</td><td>'+esc(it.r.b)+'</td><td class="n">'+fmtN(it.r.q)+'</td><td class="small">'+esc(it.msg)+'</td></tr>').join('')+'</tbody></table></div>';
-    if(await confirmBox('Có '+prob.length+' dòng không giữ được','Các dòng dưới đây <b>không có tồn / thiếu hàng / lỗi</b> nên chưa giữ hàng:'+tb+'Xóa các dòng này khỏi danh sách nhập?','Xóa các dòng này',true,'Để lại để xem / sửa',true)){
+    if(await confirmBox('Có '+prob.length+' dòng không giữ được','Các dòng dưới đây <b>không có tồn / hết hàng / lỗi</b> nên không giữ hàng:'+tb+'Xóa các dòng này khỏi danh sách nhập?','Xóa các dòng này',true,'Để lại để xem / sửa',true)){
       prob.forEach(it=>IMP.del.add(it.r.i));impRender();toast('Đã xóa '+prob.length+' dòng lỗi khỏi danh sách')}}}
 $('#impRead').onclick=async()=>{const t=$('#impPaste').value;const f=$('#impFile').files[0];$('#impReadMsg').textContent='';
   try{if(t.trim()){impLoad(impSplit(t))}
