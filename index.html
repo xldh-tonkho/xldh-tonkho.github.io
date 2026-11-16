@@ -117,6 +117,7 @@ table.sap td.av{font-weight:700}
     <button data-tab="stock" class="on">Tồn khả dụng</button>
     <button data-tab="orders">Đơn đang giữ <span class="cnt" id="cntOrders">0</span></button>
     <button data-tab="history">Lịch sử</button>
+    <button data-tab="dash">Tổng quan</button>
     <button data-tab="imp">Nhập đơn chừa</button>
     <button data-tab="guide">Hướng dẫn</button>
   </nav>
@@ -131,6 +132,7 @@ table.sap td.av{font-weight:700}
     <div class="card">
       <div class="row">
         <input type="search" id="q" class="grow" placeholder="Tìm mã hàng, tên hàng hoặc số lô… (gõ nhiều từ để lọc kỹ hơn)">
+        <button class="btn hide" id="scanBtn" title="Quét mã vạch bằng camera">📷 Quét mã</button>
         <select id="fPlant"><option value="">Tất cả kho</option></select>
         <select id="fSloc"><option value="">Tất cả kho con</option></select>
         <div class="seg" id="mode"><button data-m="lot" class="on">Theo lô</button><button data-m="mat">Theo mã</button></div>
@@ -152,6 +154,7 @@ table.sap td.av{font-weight:700}
         <button class="btn" id="bulkSo">Đóng theo danh sách số đơn SAP</button>
         <button class="btn" id="copyOrders">Sao chép danh sách</button>
         <button class="btn ok" id="exportRpt">Xuất Excel báo cáo</button>
+        <button class="btn" id="zaloRpt">Tin nhắn Zalo theo KD</button>
       </div>
     </div>
     <div id="orderList"></div>
@@ -169,6 +172,9 @@ table.sap td.av{font-weight:700}
     <div class="tw" id="historyTable"><div class="empty">Đang tải…</div></div>
   </section>
 
+  <!-- TAB: TỔNG QUAN -->
+  <section id="tab-dash" class="hide"><div id="dashBox"><div class="empty">Đang tải…</div></div></section>
+
   <!-- TAB: IMPORT ĐƠN CHỪA -->
   <section id="tab-imp" class="hide">
     <div class="card">
@@ -182,6 +188,7 @@ table.sap td.av{font-weight:700}
       <h2>Kiểm tra trước khi giữ hàng</h2>
       <div class="map" id="impMap"></div>
       <div class="row" style="margin-top:10px">
+        <label class="fld" style="margin:0"><span>Chỉ nhập Nhóm BH (KV)</span><select id="impSg"></select></label>
         <label class="fld" style="margin:0"><span>Kho mặc định (khi file không có cột kho)</span><select id="impPlant"></select></label>
         <label class="fld" style="margin:0"><span>KD mặc định</span><input type="text" id="impKD" list="dlKD"></label>
         <label class="fld" style="margin:0"><span>Ghi chú</span><input type="text" id="impNote" value="Nhập file đơn chừa"></label>
@@ -189,6 +196,16 @@ table.sap td.av{font-weight:700}
       <div id="impSum" style="margin-top:10px"></div>
       <div class="tw" id="impPrev" style="max-height:420px;margin-top:8px"></div>
       <div class="row" style="margin-top:12px"><button class="btn ok" id="impGo">Giữ hàng các dòng đã chọn</button><span class="small muted">Dòng không có lô sẽ tự chia vào các lô còn khả dụng (lô cũ trước).</span></div>
+    </div>
+    <div class="card"><h2>Các lần nhập file còn đang giữ</h2><div class="small muted" style="margin-bottom:8px">Nhập nhầm file? Bấm <b>Hoàn tác</b> để hủy toàn bộ dòng còn đang giữ của lần nhập đó (người đã nhập hoặc admin).</div><div id="impBatches"><div class="empty">Chưa có.</div></div></div>
+    <div class="card">
+      <h2>Đóng đơn đã xuất theo VA05</h2>
+      <div class="small muted" style="margin-bottom:10px">Xuất VA05 (có cột <b>Sales document</b>, <b>Material</b>, <b>Delivery Status</b> / <b>Overall Status</b>, nên có <b>Batch</b>, <b>Reason for Rejection</b>) → chọn file hoặc dán. App tự tìm đơn đang giữ cùng số đơn + mã: <b>Fully Delivered / Completed</b> → chuyển <b>Đã xuất</b>; có <b>lý do từ chối</b> → <b>Hủy</b>; <b>Partially</b> → để nguyên và báo.</div>
+      <div class="row" style="margin-bottom:8px"><input type="file" id="vaFile" accept=".xlsx,.xls,.csv,.txt"><span class="small muted">hoặc dán:</span></div>
+      <textarea id="vaPaste" placeholder="Sales document	Material	Batch	Delivery Status Description	Reason for Rejection"></textarea>
+      <div class="row" style="margin-top:8px"><button class="btn pri" id="vaRead">Đọc VA05</button><span class="small muted" id="vaMsg"></span></div>
+      <div id="vaSum" style="margin-top:10px"></div><div class="tw" id="vaPrev" style="max-height:360px;margin-top:8px"></div>
+      <div class="row hide" id="vaGoRow" style="margin-top:10px"><button class="btn ok" id="vaGo">Đóng đơn</button></div>
     </div>
   </section>
 
@@ -208,6 +225,17 @@ table.sap td.av{font-weight:700}
         <li>Nhập số lượng → <b>Thêm vào đơn</b>. Đơn nhiều mã thì bấm tiếp các dòng khác.</li>
         <li>Bấm <b>Xem &amp; lưu đơn</b> → nhập <b>CH / khách đặt</b>, KD, số đơn SAP (nếu có) → <b>Lưu giữ hàng</b>. Khả dụng trừ ngay, người khác thấy trong vòng ~20 giây.</li>
       </ol>
+      <h3>Tính năng mới</h3>
+      <ul>
+        <li><b>Nhập file an toàn:</b> chọn đúng <b>Nhóm BH</b> (KV) khi file VA05 có nhiều nhóm; dòng lặp trong file tự bỏ; trên 300 dòng phải xác nhận lần 2; nhập nhầm → tab Nhập đơn chừa → <b>Các lần nhập file</b> → <b>Hoàn tác</b>.</li>
+        <li><b>Đóng đơn theo VA05:</b> tab Nhập đơn chừa → mục <b>Đóng đơn đã xuất theo VA05</b> → chọn file VA05 → app tự chuyển Đã xuất / Hủy.</li>
+        <li><b>Tổng quan:</b> số đơn chừa theo KV, KD, mã chừa nhiều nhất, lô sắp hết khả dụng.</li>
+        <li><b>Tin nhắn Zalo theo KD:</b> tab Đơn đang giữ → nút <b>Tin nhắn Zalo theo KD</b> → chọn KV → sao chép dán vào nhóm.</li>
+        <li><b>Mật khẩu riêng:</b> lần đầu đăng nhập app yêu cầu đổi mật khẩu (lưu mã hóa). Quên mật khẩu: admin gõ mật khẩu tạm vào cột Mật khẩu ở trang TaiKhoan → người dùng đăng nhập rồi đổi lại.</li>
+        <li><b>Tài khoản KD:</b> quyền <b>kd</b> + cột <b>KD phụ trách</b> ở trang TaiKhoan → KD chỉ xem đơn chừa của khách mình (theo DM_KH).</li>
+        <li><b>Điện thoại:</b> nút <b>📷 Quét mã</b> cạnh ô tìm (Chrome Android) để quét mã vạch tìm nhanh khả dụng.</li>
+        <li><b>Tự động:</b> mỗi ngày app tự sao lưu (file <b>Sao lưu App tồn kho</b> trên Drive, xoay vòng 7 ngày T2…CN); mỗi tuần tự chuyển đơn đã đóng quá 3 ngày sang trang <b>DonGiu_LuuTru</b> (tab Lịch sử vẫn xem được); khi file tồn cập nhật làm lô bị âm, app hiện cảnh báo đỏ trên đầu trang.</li>
+      </ul>
       <h3>Nhập file đơn chừa (giữ hàng hàng loạt)</h3>
       <ol>
         <li>Tab <b>Nhập đơn chừa</b> → chọn file Excel / CSV (ví dụ xuất VA05) hoặc dán bảng → <b>Đọc dữ liệu</b>.</li>
@@ -505,7 +533,7 @@ function renderOrders(){
   $('#reconcile').innerHTML=iss.length?'<div class="card" style="border-color:#f4c7c2"><h2 style="color:var(--bad)">Cần kiểm tra ('+iss.length+' dòng)</h2><div class="small muted" style="margin-bottom:8px">Sau lần cập nhật tồn SAP, các dòng dưới đây có thể đã xuất hàng trên SAP nhưng chưa đóng trong app (đang bị trừ 2 lần).</div><div class="tw"><table><thead><tr><th>Mã giữ</th><th>CH / khách</th><th>Mã</th><th>Lô</th><th>Kho</th><th class="n">SL</th><th>Số SAP</th><th>Lý do</th><th></th></tr></thead><tbody>'+
     iss.map(({o,why})=>'<tr><td>'+esc(o.orderNo)+'</td><td>'+esc(o.ch)+'</td><td><b>'+esc(o.m)+'</b></td><td>'+esc(o.b)+'</td><td>'+esc(o.p)+(o.s?' / '+esc(o.s):'')+'</td><td class="n">'+fmtN(o.qty)+'</td><td>'+esc(o.so)+'</td><td><span class="pill bad">'+esc(why)+'</span></td><td>'+(S.canWrite===false?'':'<button class="btn sm ok" data-close="'+esc(o.id)+'">'+doneLbl()+'</button>')+'</td></tr>').join('')+'</tbody></table></div></div>':'';
   const q=norm($('#oq').value);const terms=q.split(/\s+/).filter(Boolean);
-  const list=S.orders.filter(o=>!terms.length||terms.every(t=>norm([o.orderNo,o.ch,o.kd,o.so,o.m,o.d,o.b,o.note].join(' ')).includes(t)));
+  const list=visOrders().filter(o=>!terms.length||terms.every(t=>norm([o.orderNo,o.ch,o.kd,o.so,o.m,o.d,o.b,o.note].join(' ')).includes(t)));
   const groups=groupOrders(list);wantNames(groups.map(g=>g.o.createdBy));
   if(!groups.length){box.innerHTML='<div class="empty">'+(S.orders.length?'Không có đơn khớp bộ lọc.':'Chưa có đơn nào đang giữ hàng.')+'</div>';return}
   const ro=S.canWrite===false;
@@ -572,17 +600,20 @@ function renderHistory(){
 /* ---------- global banner / tabs ---------- */
 function renderGlobal(){
   const g=$('#globalMsg');let h='';
-  if(S.sess&&S.canWrite===false)h='<div class="banner info">Tài khoản <b>chỉ xem</b>: xem được khả dụng nhưng không giữ hàng / đóng đơn.</div>';
+  if(S.sess&&S.canWrite===false)h='<div class="banner info">Tài khoản <b>'+(S.sess.role==='kd'?'KD '+esc(S.sess.kd||''):'chỉ xem')+'</b>: xem được khả dụng'+(S.sess.role==='kd'?' và đơn chừa của khách mình phụ trách':'')+', không giữ hàng / đóng đơn.</div>';
+  if(S.sess&&S.sess.mustChange)h+='<div class="banner warn">Bạn cần <b>đổi mật khẩu</b> trước khi giữ hàng. <button class="btn sm" id="gPw">Đổi mật khẩu</button></div>';
+  if(S.sess&&S.canWrite&&S.metaLoaded&&S.resv){let ng=0;for(const [k] of S.resv){if(S.stockByKey.has(k)&&availOf(k)<-0.0005)ng++}if(ng)h+='<div class="banner bad"><b>'+ng+' lô đang âm khả dụng</b> (file tồn vừa cập nhật giảm). Vào tab Tồn khả dụng → ô “dòng khả dụng âm” → <b>Điều chỉnh về đúng khả dụng</b>.</div>'}
   if(S.offline)h+='<div class="banner warn">Mất kết nối máy chủ – số liệu có thể chưa mới nhất. App sẽ tự thử lại.</div>';
   g.innerHTML=h;
-  const ub=$('#userBox');ub.innerHTML=S.sess?'<span class="muted">'+esc(S.sess.name)+' · '+esc(S.sess.role)+'</span><button class="btn sm" id="btnReload">Tải lại</button><button class="btn sm" id="btnLogout">Đăng xuất</button>':'';
-  if(S.sess){$('#btnReload').onclick=()=>{loadStock(true);refreshState()};$('#btnLogout').onclick=doLogout}
+  const ub=$('#userBox');ub.innerHTML=S.sess?'<span class="muted">'+esc(S.sess.name)+' · '+esc(S.sess.role)+'</span><button class="btn sm" id="btnReload">Tải lại</button><button class="btn sm" id="btnPw">Đổi mật khẩu</button><button class="btn sm" id="btnLogout">Đăng xuất</button>':'';
+  if(S.sess){$('#btnReload').onclick=()=>{loadStock(true);refreshState()};$('#btnLogout').onclick=doLogout;$('#btnPw').onclick=()=>openPw(false)}
+  const gp=$('#gPw');if(gp)gp.onclick=()=>openPw(true);
 }
 function switchTab(t){S.tab=t;document.querySelectorAll('#nav button').forEach(b=>b.classList.toggle('on',b.dataset.tab===t));
   document.querySelectorAll('main>section').forEach(s=>s.classList.toggle('hide',s.id!=='tab-'+t));
-  if(t==='stock')renderStock();if(t==='orders')renderOrders();if(t==='history')loadHistory();if(t==='imp')impInit();
+  if(t==='stock')renderStock();if(t==='orders')renderOrders();if(t==='history')loadHistory();if(t==='imp'){impInit();renderBatches()}if(t==='dash')renderDash();
   try{localStorage.setItem('tk_tab',t)}catch(e){}}
-function renderAll(){renderSnap();renderGlobal();if(S.tab==='stock')renderStock();if(S.tab==='orders')renderOrders();if(S.tab==='stock'||S.tab==='orders')renderStats()}
+function renderAll(){renderSnap();renderGlobal();if(S.tab==='stock')renderStock();if(S.tab==='orders')renderOrders();if(S.tab==='imp')renderBatches();if(S.tab==='stock'||S.tab==='orders')renderStats()}
 
 /* ---------- events ---------- */
 document.getElementById('nav').addEventListener('click',e=>{const b=e.target.closest('button');if(b)switchTab(b.dataset.tab)});
@@ -609,7 +640,7 @@ $('#cartClear').onclick=async()=>{if(await confirmBox('Bỏ đơn đang soạn',
 $('#orderList').addEventListener('click',onOrdersClick);$('#reconcile').addEventListener('click',onOrdersClick);
 let oT=null;$('#oq').addEventListener('input',()=>{clearTimeout(oT);oT=setTimeout(renderOrders,150)});
 $('#bulkSo').onclick=openBulkSo;
-$('#copyOrders').onclick=()=>{const terms=norm($('#oq').value).split(/\s+/).filter(Boolean);const list=S.orders.filter(o=>!terms.length||terms.every(t=>norm([o.orderNo,o.ch,o.kd,o.so,o.m,o.d,o.b,o.note].join(' ')).includes(t)));
+$('#copyOrders').onclick=()=>{const terms=norm($('#oq').value).split(/\s+/).filter(Boolean);const list=visOrders().filter(o=>!terms.length||terms.every(t=>norm([o.orderNo,o.ch,o.kd,o.so,o.m,o.d,o.b,o.note].join(' ')).includes(t)));
   copyText(ordersTSV(groupOrders(list).flatMap(g=>g.ls)))};
 let hT=null;$('#hq').addEventListener('input',()=>{clearTimeout(hT);hT=setTimeout(renderHistory,150)});
 $('#hReload').onclick=loadHistory;
@@ -617,7 +648,7 @@ document.addEventListener('keydown',e=>{if(e.key==='Escape'){const ovs=document.
 
 /* ---------- nhập file đơn chừa ---------- */
 const IMP={mat:null,hdr:0,cols:{},rows:[],plan:[],del:new Set()};
-const IMPF=[['so','Số đơn SAP'],['ch','Khách / CH'],['kd','KD'],['m','Mã hàng *'],['p','Kho (Plant)'],['s','Kho con (SLoc)'],['x','Màu'],['b','Lô (Batch)'],['q','Số lượng *'],['u','ĐVT'],['sg','Nhóm BH (Sales group)'],['kh','Mã KH']];
+const IMPF=[['so','Số đơn SAP'],['ch','Khách / CH'],['kd','KD'],['m','Mã hàng *'],['p','Kho (Plant)'],['s','Kho con (SLoc)'],['x','Màu'],['b','Lô (Batch)'],['q','Số lượng *'],['u','ĐVT'],['sg','Nhóm BH (Sales group)'],['kh','Mã KH'],['it','Dòng SAP (Item)']];
 let xlsxP=null;
 function loadXlsx(){if(window.XLSX)return Promise.resolve();if(xlsxP)return xlsxP;
   xlsxP=new Promise((res,rej)=>{const sc=document.createElement('script');sc.src='https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js';sc.onload=()=>res();sc.onerror=()=>{xlsxP=null;rej(new Error('Không tải được bộ đọc Excel'))};document.head.appendChild(sc)});return xlsxP}
@@ -639,19 +670,21 @@ function impDetect(h){const H=h.map(x=>norm(x).replace(/[^a-z0-9 ]/g,' ').replac
   c.u=pick([x=>/^(su|sales unit|dvt|don vi|un|bun|uom)$/.test(x)]);
   c.sg=pick([x=>/^(sales group|nhom ban hang|nhom bh|sales grp|sgrp)$/.test(x)]);
   c.kh=pick([x=>/^(sold to party|sold to|ma kh|ma khach hang|ma khach|customer|customer number)$/.test(x)]);
+  c.it=pick([x=>/^(item|sales document item|so dong|dong|line item)$/.test(x)]);
   return c}
 function impNum(v){if(typeof v==='number')return v;let s=String(v||'').replace(/\s/g,'');if(!s)return NaN;if(s.includes(',')&&!s.includes('.'))s=/^\d{1,3}(,\d{3})+$/.test(s)?s.replace(/,/g,''):s.replace(',','.');else if(s.includes(',')&&s.includes('.'))s=s.lastIndexOf(',')>s.lastIndexOf('.')?s.replace(/\./g,'').replace(',','.'):s.replace(/,/g,'');else if(/^\d{1,3}(\.\d{3})+$/.test(s))s=s.replace(/\./g,'');return parseFloat(s)}
 function impLoad(mat){mat=mat.map(r=>(r||[]).map(v=>v==null?'':v));let hi=0,c=null;
   for(let i=0;i<Math.min(mat.length,25);i++){const d=impDetect(mat[i]);if(d.m>=0&&d.q>=0){hi=i;c=d;break}}
   if(!c){hi=0;c=impDetect(mat[0]||[]);toast('Không tự nhận được cột Mã hàng / Số lượng – chọn tay bên dưới',true)}
-  IMP.mat=mat;IMP.hdr=hi;IMP.cols=c;IMP.del=new Set();$('#impMapCard').classList.remove('hide');impInit();impRender()}
+  IMP.mat=mat;IMP.hdr=hi;IMP.cols=c;IMP.del=new Set();IMP.sgSel=null;$('#impMapCard').classList.remove('hide');impInit();impRender()}
 function impBuild(){const c=IMP.cols,mat=IMP.mat,dp=$('#impPlant').value,dkd=clean($('#impKD').value);const g=(r,k)=>c[k]>=0?clean(r[c[k]]):'';
-  const rows=[];for(let i=IMP.hdr+1;i<mat.length;i++){if(IMP.del.has(i))continue;const r=mat[i];const m=g(r,'m');if(!m)continue;if(/^(tong|total)/.test(norm(m)))continue;
-    const q=impNum(c.q>=0?r[c.q]:'');if(!(q>0))continue;rows.push({i,sg:g(r,'sg'),kh:g(r,'kh'),so:g(r,'so'),ch:g(r,'ch'),kd:g(r,'kd')||dkd,m,p:g(r,'p')||dp,s:g(r,'s'),x:g(r,'x'),b:g(r,'b'),q:r3(q),u:g(r,'u')})}
+  let skipSg=0;const rows=[];for(let i=IMP.hdr+1;i<mat.length;i++){if(IMP.del.has(i))continue;const r=mat[i];const m=g(r,'m');if(!m)continue;if(/^(tong|total)/.test(norm(m)))continue;
+    const q=impNum(c.q>=0?r[c.q]:'');if(!(q>0))continue;const sg=g(r,'sg');if(IMP.sgSel&&sg&&sg!==IMP.sgSel){skipSg++;continue}rows.push({i,it:g(r,'it'),sg,kh:g(r,'kh'),so:g(r,'so'),ch:g(r,'ch'),kd:g(r,'kd')||dkd,m,p:g(r,'p')||dp,s:g(r,'s'),x:g(r,'x'),b:g(r,'b'),q:r3(q),u:g(r,'u')})}
   // existing holds -> duplicate detection
   const ex=new Set(S.orders.map(o=>[normSo(o.so),o.m,o.b].join('|')));const exNoB=new Set(S.orders.map(o=>[normSo(o.so),o.m].join('|')));
-  const used=new Map();const plan=[];
+  const used=new Map();const plan=[];const seenF=new Set();IMP.skipSg=skipSg;
   for(const r of rows){const it={r,lines:[],st:'ok',msg:'',on:true};plan.push(it);
+    const fk=r.so&&r.it?normSo(r.so)+'|'+r.it:[normSo(r.so),r.ch,r.m,r.b,r.q].join('|');if(seenF.has(fk)){it.st='dup';it.msg='Dòng lặp trong file – bỏ qua';it.on=false;continue}seenF.add(fk);
     if(!r.p){it.st='bad';it.msg='Thiếu kho – chọn Kho mặc định';it.on=false;continue}
     if(r.so&&(r.b?ex.has([normSo(r.so),r.m,r.b].join('|')):exNoB.has([normSo(r.so),r.m].join('|')))){it.st='dup';it.msg='Đã có trong app – bỏ qua';it.on=false;continue}
     let cand=S.stock.filter(x=>x.m===r.m&&x.p===r.p&&(!r.b||x.b===r.b)&&(!r.s||x.s===r.s)&&(!r.x||x.x===r.x));
@@ -669,8 +702,12 @@ function impBuild(){const c=IMP.cols,mat=IMP.mat,dp=$('#impPlant').value,dkd=cle
 function impRender(){const hdr=IMP.mat[IMP.hdr]||[];const opts=sel=>'<option value="-1">— không có —</option>'+hdr.map((h,i)=>'<option value="'+i+'"'+(i===sel?' selected':'')+'>'+esc(h||('Cột '+(i+1)))+'</option>').join('');
   $('#impMap').innerHTML=IMPF.map(([k,l])=>'<label class="fld" style="margin:0"><span>'+l+'</span><select data-ic="'+k+'">'+opts(IMP.cols[k])+'</select></label>').join('');
   $('#impMap').querySelectorAll('select').forEach(sl=>sl.onchange=()=>{IMP.cols[sl.dataset.ic]=+sl.value;impRender()});
+  {const c=IMP.cols;const cntSg={};if(c.sg>=0)for(let i=IMP.hdr+1;i<IMP.mat.length;i++){const v=clean((IMP.mat[i]||[])[c.sg]);if(v)cntSg[v]=(cntSg[v]||0)+1}
+    const ks=Object.keys(cntSg).sort((a,b)=>cntSg[b]-cntSg[a]);if(IMP.sgSel===null)IMP.sgSel=ks.length>1?ks[0]:'';
+    $('#impSg').innerHTML=(ks.length?'<option value="">Tất cả nhóm ('+ks.length+')</option>':'<option value="">— file không có cột Nhóm BH —</option>')+ks.map(k=>'<option value="'+esc(k)+'"'+(k===IMP.sgSel?' selected':'')+'>'+esc(k)+' ('+cntSg[k]+' dòng)</option>').join('');
+    $('#impSg').onchange=()=>{IMP.sgSel=$('#impSg').value;impRender()};IMP.sgCount=ks.length}
   impBuild();const P=IMP.plan;const cnt=k=>P.filter(x=>x.st===k).length;const on=P.filter(x=>x.on);
-  $('#impSum').innerHTML='<div class="banner info">Đọc được <b>'+P.length+'</b> dòng: <b>'+cnt('ok')+'</b> hợp lệ, <b>'+cnt('part')+'</b> chỉ giữ được một phần (đúng khả dụng), <b>'+cnt('warn')+'</b> hết hàng, <b>'+cnt('dup')+'</b> đã có trong app (bỏ qua), <b>'+cnt('bad')+'</b> không khớp tồn. Sẽ giữ hàng <b>'+on.length+'</b> dòng ('+new Set(on.map(x=>x.r.so||x.r.ch||'?')).size+' đơn).'+((cnt('warn')+cnt('bad'))?' Dòng hết hàng / lỗi không giữ – bấm nút bên dưới, app sẽ hỏi có xóa khỏi danh sách không.':'')+'</div>';
+  $('#impSum').innerHTML='<div class="banner info">Đọc được <b>'+P.length+'</b> dòng: <b>'+cnt('ok')+'</b> hợp lệ, <b>'+cnt('part')+'</b> chỉ giữ được một phần (đúng khả dụng), <b>'+cnt('warn')+'</b> hết hàng, <b>'+cnt('dup')+'</b> đã có trong app (bỏ qua), <b>'+cnt('bad')+'</b> không khớp tồn. '+(IMP.skipSg?'Bỏ qua <b>'+IMP.skipSg+'</b> dòng khác Nhóm BH '+esc(IMP.sgSel)+'. ':'')+(IMP.sgCount>1&&!IMP.sgSel?'<b style="color:var(--bad)">File có '+IMP.sgCount+' nhóm BH – nên chọn đúng nhóm của KV mình.</b> ':'')+'Sẽ giữ hàng <b>'+on.length+'</b> dòng ('+new Set(on.map(x=>x.r.so||x.r.ch||'?')).size+' đơn).'+((cnt('warn')+cnt('bad'))?' Dòng hết hàng / lỗi không giữ – bấm nút bên dưới, app sẽ hỏi có xóa khỏi danh sách không.':'')+'</div>';
   const pill={ok:'<span class="pill ok">OK</span>',warn:'<span class="pill bad">Hết hàng</span>',part:'<span class="pill warn">Giữ một phần</span>',dup:'<span class="pill info">Đã có</span>',bad:'<span class="pill bad">Lỗi</span>'};
   $('#impPrev').innerHTML='<table><thead><tr><th></th><th>Trạng thái</th><th>Số SAP</th><th>Khách / CH</th><th>KD</th><th>Mã</th><th>Kho</th><th>Lô sẽ giữ</th><th class="n">SL</th><th>Ghi chú</th></tr></thead><tbody>'+
     P.map((it,i)=>'<tr><td><input type="checkbox" data-ii="'+i+'"'+(it.on?' checked':'')+(it.st==='bad'||it.st==='warn'?' disabled':'')+'></td><td>'+pill[it.st]+'</td><td>'+esc(it.r.so)+'</td><td>'+esc(it.r.ch)+'</td><td>'+esc(it.r.kd)+'</td><td><b>'+esc(it.r.m)+'</b></td><td>'+esc(it.r.p)+'</td><td>'+(it.lines.map(l=>esc(l.x.b)+(l.x.x?' ('+esc(l.x.x)+')':'')+(it.lines.length>1?': '+fmtN(l.qty):'')).join('<br>')||esc(it.r.b))+'</td><td class="n">'+fmtN(it.r.q)+'</td><td class="small">'+esc(it.msg)+'</td></tr>').join('')+'</tbody></table>';
@@ -686,8 +723,9 @@ async function impGo(){const on=IMP.plan.filter(x=>x.on&&x.lines.length);const p
       const g=groups.get(key);for(const l of it.lines){const x=l.x;g.lines.push({m:x.m,d:x.d,p:x.p,n:x.n,s:x.s,x:x.x,g:x.g,b:x.b,u:x.u||r.u,qty:l.qty})}}
     const orders=[...groups.values()];
     if(!await confirmBox('Giữ hàng từ file','Giữ hàng <b>'+on.length+'</b> dòng'+(on.some(x=>x.st==='part')?' (có '+on.filter(x=>x.st==='part').length+' dòng chỉ giữ một phần = đúng khả dụng)':' OK')+' ('+orders.length+' đơn, '+orders.reduce((a,o)=>a+o.lines.length,0)+' dòng giữ). Khả dụng sẽ bị trừ ngay cho cả nhóm.'+(prob.length?'<div class="small muted" style="margin-top:6px">'+prob.length+' dòng hết hàng / lỗi không giữ – sẽ hỏi xóa ở bước sau.</div>':''),'Giữ hàng'))return;
+    if(on.length>300&&!await confirmBox('Xác nhận lần 2','Bạn sắp giữ <b>'+on.length+'</b> dòng cùng lúc – rất nhiều. Kiểm tra lại <b>Nhóm BH</b> / file đúng KV chưa? Nhập nhầm vẫn hoàn tác được ở mục <b>Các lần nhập file</b>.','Vẫn giữ hàng',true))return;
     const b=$('#impGo');b.disabled=true;b.textContent='Đang lưu…';
-    try{const res=await api('importOrders',orders);on.forEach(it=>IMP.del.add(it.r.i));await refreshState();toast('Đã giữ hàng '+res.orders+' đơn ('+res.lines+' dòng) từ file'+((res.cut&&res.cut.length)?' – '+res.cut.length+' dòng bị giảm theo khả dụng mới nhất':''))}
+    try{const res=await api('importOrders',orders);on.forEach(it=>IMP.del.add(it.r.i));await refreshState();renderBatches();toast('Đã giữ hàng '+res.orders+' đơn ('+res.lines+' dòng) từ file'+((res.cut&&res.cut.length)?' – '+res.cut.length+' dòng bị giảm theo khả dụng mới nhất':''))}
     catch(e){const m=errMsg(e);if(m.indexOf('HET_KHA_DUNG')>=0||m.indexOf('VUOT_KHA_DUNG')>=0){await refreshState();impRender();toast('Chưa lưu – người khác vừa giữ hàng trước. App đã tính lại khả dụng, kiểm tra rồi bấm lại.',true)}else{impRender();toast('Lỗi: '+m,true)}return}}
   impRender();
   if(prob.length){const tb='<div class="tw" style="max-height:300px;margin:8px 0"><table><thead><tr><th>Số SAP</th><th>Khách / CH</th><th>Mã</th><th>Kho</th><th>Lô</th><th class="n">SL</th><th>Lý do</th></tr></thead><tbody>'+
@@ -707,10 +745,7 @@ $('#impGo').onclick=impGo;
 /* ---------- xuất Excel báo cáo đơn chừa ---------- */
 async function exportReport(){const b=$('#exportRpt');const old=b.textContent;b.disabled=true;b.textContent='Đang tạo file…';
   try{await loadXlsx();await refreshState();const dm=await api('getDanhMuc');
-    const nm=x=>String(x||'').split(String.fromCharCode(0x200b)).join('').toLowerCase().replace(/\s+/g,' ').trim();
-    const kvOf={};(dm.kv||[]).forEach(r=>{if(r[0])kvOf[r[0]]=r[1]});const byCode={},byName={};(dm.kh||[]).forEach(r=>{const o={code:r[0],name:r[1],sg:r[2],kd:r[3]};if(r[0])byCode[r[0]]=o;if(r[1]&&!byName[nm(r[1])])byName[nm(r[1])]=o});
-    const L=S.orders.filter(o=>o.status==='giu'||!o.status).map(o=>{const c=(o.kh&&byCode[o.kh])||byName[nm(o.ch)]||{};const sg=o.sg||c.sg||'';
-      return {kv:(sg&&kvOf[sg])||(sg?'Nhóm BH '+sg:'Chưa phân KV'),sg,kd:o.kd||c.kd||'Chưa phân KD',by:o.createdBy||'',kh:o.kh||c.code||'',ch:o.ch||'',so:o.so||'',no:o.orderNo,m:o.m,d:o.d,p:o.p,n:o.n||'',s:o.s,x:o.x,b:o.b,u:o.u||'',q:+o.qty||0,note:o.note||''}});
+    S.dm={kv:dm.kv,kh:dm.kh,at:Date.now()};const L=buildL();
     if(!L.length){toast('Không có đơn đang giữ để xuất',true);return}
     const units=Object.entries(L.reduce((a,x)=>(a[x.u]=(a[x.u]||0)+1,a),{})).sort((a,b)=>b[1]-a[1]).map(x=>x[0]);
     const now=new Date();const ts=pad(now.getDate())+'/'+pad(now.getMonth()+1)+'/'+now.getFullYear()+' '+pad(now.getHours())+':'+pad(now.getMinutes());
@@ -734,6 +769,117 @@ async function exportReport(){const b=$('#exportRpt');const old=b.textContent;b.
   catch(e){toast('Lỗi xuất Excel: '+errMsg(e),true)}finally{b.disabled=false;b.textContent=old}}
 $('#exportRpt').onclick=exportReport;
 
+/* ---------- quyền KD, danh mục, dòng báo cáo ---------- */
+const canW=r=>r!=='xem'&&r!=='kd';
+const nmK=x=>String(x||'').split(String.fromCharCode(0x200b)).join('').toLowerCase().replace(/\s+/g,' ').trim();
+async function getDM(force){if(!force&&S.dm&&Date.now()-S.dm.at<5*60000)return S.dm;const dm=await api('getDanhMuc');S.dm={kv:dm.kv||[],kh:dm.kh||[],at:Date.now()};S.dmIdx=null;return S.dm}
+function dmIdx(){if(S.dmIdx&&S.dmIdx.at===S.dm.at)return S.dmIdx;const kvOf={},byCode={},byName={};
+  (S.dm.kv||[]).forEach(r=>{if(r[0])kvOf[r[0]]=r[1]});(S.dm.kh||[]).forEach(r=>{const o={code:r[0],name:r[1],sg:r[2],kd:r[3]};if(r[0])byCode[r[0]]=o;if(r[1]&&!byName[nmK(r[1])])byName[nmK(r[1])]=o});
+  S.dmIdx={at:S.dm.at,kvOf,byCode,byName};return S.dmIdx}
+function resolveO(o){if(!S.dm)return {kv:'',sg:o.sg||'',kd:o.kd||'',kh:o.kh||''};const X=dmIdx();const c=(o.kh&&X.byCode[o.kh])||X.byName[nmK(o.ch)]||{};const sg=o.sg||c.sg||'';
+  return {kv:(sg&&X.kvOf[sg])||(sg?'Nhóm BH '+sg:'Chưa phân KV'),sg,kd:o.kd||c.kd||'Chưa phân KD',kh:o.kh||c.code||''}}
+function isMine(o){const me=S.sess&&S.sess.kd;if(!me)return false;return nmK(resolveO(o).kd)===nmK(me)}
+function visOrders(){return S.sess&&S.sess.role==='kd'?S.orders.filter(isMine):S.orders}
+function buildL(){return visOrders().map(o=>{const r=resolveO(o);
+  return {kv:r.kv,sg:r.sg,kd:r.kd,by:o.createdBy||'',kh:r.kh,ch:o.ch||'',so:o.so||'',no:o.orderNo,m:o.m,d:o.d,p:o.p,n:o.n||'',s:o.s,x:o.x,b:o.b,u:o.u||'',q:+o.qty||0,note:o.note||''}})}
+
+/* ---------- đổi mật khẩu ---------- */
+function openPw(force){if(document.getElementById('pwOld'))return;
+  const ov=openModal('<div class="dh">Đổi mật khẩu</div><div class="db">'+(force?'<div class="banner warn" style="margin-bottom:10px">Mật khẩu hiện tại là mật khẩu chung / chưa mã hóa. Đặt mật khẩu riêng để giữ hàng (ít nhất 6 ký tự).</div>':'')+
+    '<label class="fld"><span>Mật khẩu hiện tại</span><input type="password" id="pwOld" autofocus></label><label class="fld"><span>Mật khẩu mới</span><input type="password" id="pwNew"></label><label class="fld"><span>Nhập lại mật khẩu mới</span><input type="password" id="pwNew2"></label><div id="pwErr" class="small" style="color:var(--bad)"></div></div>'+
+    '<div class="df"><button class="btn" data-x>'+(force?'Để sau':'Thôi')+'</button><button class="btn pri" data-ok>Lưu mật khẩu</button></div>');
+  ov.querySelector('[data-x]').onclick=()=>ov.remove();
+  ov.querySelector('[data-ok]').onclick=async()=>{const o=ov.querySelector('#pwOld').value,n=ov.querySelector('#pwNew').value,n2=ov.querySelector('#pwNew2').value;const er=ov.querySelector('#pwErr');
+    if(n!==n2){er.textContent='Hai lần nhập mật khẩu mới không giống nhau';return}
+    try{await api('changePassword',o,n);S.sess.mustChange=false;try{localStorage.setItem('tk_sess',JSON.stringify(S.sess))}catch(e){}ov.remove();renderAll();toast('Đã đổi mật khẩu')}catch(e){er.textContent=errMsg(e)}}}
+
+/* ---------- các lần nhập file + hoàn tác ---------- */
+function renderBatches(){const box=document.getElementById('impBatches');if(!box)return;const m=new Map();
+  for(const o of S.orders){if(!o.imp)continue;let g=m.get(o.imp);if(!g){g={id:o.imp,by:o.createdBy,at:o.createdAt,n:0,don:new Set()};m.set(o.imp,g)}g.n++;g.don.add(o.orderNo);if(String(o.createdAt)<String(g.at))g.at=o.createdAt}
+  const L=[...m.values()].sort((a,b)=>String(b.at).localeCompare(String(a.at))).slice(0,15);
+  if(!L.length){box.innerHTML='<div class="empty">Chưa có lần nhập nào còn đang giữ.</div>';return}
+  box.innerHTML='<table><thead><tr><th>Lần nhập</th><th>Người nhập</th><th>Lúc</th><th class="n">Số đơn</th><th class="n">Dòng đang giữ</th><th></th></tr></thead><tbody>'+
+    L.map(g=>'<tr><td>'+esc(g.id)+'</td><td>'+esc(g.by)+'</td><td>'+esc(fmtDT(g.at))+'</td><td class="n">'+g.don.size+'</td><td class="n">'+g.n+'</td><td>'+(S.canWrite?'<button class="btn sm bad" data-undo="'+esc(g.id)+'">Hoàn tác</button>':'')+'</td></tr>').join('')+'</tbody></table>';
+  box.querySelectorAll('[data-undo]').forEach(b=>b.onclick=async()=>{const id=b.dataset.undo;const g=m.get(id);
+    if(!await confirmBox('Hoàn tác lần nhập','Hủy <b>'+g.n+'</b> dòng còn đang giữ của lần nhập <b>'+esc(id)+'</b> ('+esc(g.by)+', '+esc(fmtDT(g.at))+')? Khả dụng sẽ được trả lại ngay.','Hoàn tác',true))return;
+    b.disabled=true;try{const n=await api('undoImport',id);await refreshState();renderBatches();toast('Đã hoàn tác '+n+' dòng')}catch(e){toast('Lỗi: '+errMsg(e),true);b.disabled=false}})}
+
+/* ---------- đóng đơn đã xuất theo VA05 ---------- */
+const VA={plan:[]};
+function vaDetect(h){const H=h.map(x=>norm(x).replace(/[^a-z0-9 ]/g,' ').replace(/\s+/g,' ').trim());const f=re=>H.findIndex(x=>re.test(x));
+  return {so:f(/^(sales document|sales doc|so don|so don sap|so don hang|vbeln)$/),m:f(/^(material|ma hang|ma vat tu|material number)$/),b:f(/^(batch|lo|so lo)$/),
+    ds:f(/delivery status/),os:f(/overall status/),rj:f(/reason for rejection|ly do tu choi/),ch:f(/sold to party name|name 1|ten khach/)}}
+function vaLoad(mat){mat=mat.map(r=>(r||[]).map(v=>v==null?'':v));let hi=-1,c=null;
+  for(let i=0;i<Math.min(mat.length,25);i++){const d=vaDetect(mat[i]);if(d.so>=0&&d.m>=0&&(d.ds>=0||d.os>=0)){hi=i;c=d;break}}
+  if(!c){toast('Không thấy cột Sales document / Material / Delivery Status trong file',true);return}
+  const g=(r,k)=>c[k]>=0?clean(r[c[k]]):'';const by=new Map();
+  for(let i=hi+1;i<mat.length;i++){const r=mat[i];const so=normSo(g(r,'so'));if(!so)continue;(by.get(so)||by.set(so,[]).get(so)).push({m:g(r,'m'),b:g(r,'b'),st:(g(r,'ds')+' '+g(r,'os')).toLowerCase(),rj:g(r,'rj')})}
+  const plan=[];
+  for(const o of S.orders){if(!o.so)continue;const ls=by.get(normSo(o.so));if(!ls)continue;const mt=ls.filter(l=>l.m===o.m&&(!o.b||!l.b||l.b===o.b));if(!mt.length)continue;
+    let act='open';if(mt.every(l=>l.rj))act='huy';else{const ok=mt.filter(l=>!l.rj);if(ok.every(l=>/fully|completed/.test(l.st)&&!/partial/.test(l.st)))act='xong';else if(ok.some(l=>/partial/.test(l.st)))act='part'}
+    plan.push({o,act})}
+  VA.plan=plan;vaRender()}
+function vaRender(){const P=VA.plan;const n=k=>P.filter(x=>x.act===k).length;
+  $('#vaSum').innerHTML='<div class="banner info">Khớp <b>'+P.length+'</b> dòng đang giữ với VA05: <b>'+n('xong')+'</b> đã xuất hết → <b>Đã xuất</b>, <b>'+n('huy')+'</b> bị từ chối → <b>Hủy</b>, <b>'+n('part')+'</b> mới lấy 1 phần (để nguyên), <b>'+n('open')+'</b> chưa xuất.</div>';
+  const lab={xong:'<span class="pill ok">Đã xuất</span>',huy:'<span class="pill bad">Hủy</span>',part:'<span class="pill warn">Lấy 1 phần</span>',open:'<span class="pill info">Chưa xuất</span>'};
+  const show=P.filter(x=>x.act!=='open').slice(0,400);
+  $('#vaPrev').innerHTML=show.length?'<table><thead><tr><th>Sẽ làm</th><th>Số SAP</th><th>Khách / CH</th><th>Mã</th><th>Lô</th><th>Kho</th><th class="n">SL giữ</th><th>Người giữ</th></tr></thead><tbody>'+
+    show.map(({o,act})=>'<tr><td>'+lab[act]+'</td><td>'+esc(o.so)+'</td><td>'+esc(o.ch)+'</td><td><b>'+esc(o.m)+'</b></td><td>'+esc(o.b)+'</td><td>'+esc(o.p)+'</td><td class="n">'+fmtN(o.qty)+'</td><td>'+esc(o.createdBy)+'</td></tr>').join('')+'</tbody></table>':'';
+  const go=n('xong')+n('huy');$('#vaGoRow').classList.toggle('hide',!go);$('#vaGo').textContent='Đóng '+n('xong')+' dòng đã xuất · hủy '+n('huy')+' dòng bị từ chối';$('#vaGo').disabled=!go||S.canWrite===false}
+$('#vaRead').onclick=async()=>{const t=$('#vaPaste').value;const f=$('#vaFile').files[0];$('#vaMsg').textContent='';
+  try{if(t.trim())vaLoad(impSplit(t));else if(f){if(/\.(xlsx|xls)$/i.test(f.name)){$('#vaMsg').textContent='Đang đọc file…';await loadXlsx();const wb=XLSX.read(await f.arrayBuffer(),{type:'array'});let best=null;
+        for(const n of wb.SheetNames){const m=XLSX.utils.sheet_to_json(wb.Sheets[n],{header:1,raw:false,defval:''});if(!best||m.length>best.length)best=m}vaLoad(best||[]);$('#vaMsg').textContent=''}else vaLoad(impSplit(await f.text()))}
+    else toast('Chọn file hoặc dán VA05 trước',true)}catch(e){$('#vaMsg').textContent='';toast('Không đọc được: '+errMsg(e),true)}};
+$('#vaGo').onclick=async()=>{const xs=VA.plan.filter(x=>x.act==='xong').map(x=>x.o.id),hs=VA.plan.filter(x=>x.act==='huy').map(x=>x.o.id);
+  if(!await confirmBox('Đóng đơn theo VA05','Chuyển <b>'+xs.length+'</b> dòng sang <b>Đã xuất</b> và <b>'+hs.length+'</b> dòng sang <b>Hủy</b>. Khả dụng được trả lại ngay.','Đóng đơn'))return;
+  const b=$('#vaGo');b.disabled=true;b.textContent='Đang lưu…';
+  try{for(let i=0;i<xs.length;i+=400)await api('setStatus',xs.slice(i,i+400),'xong');for(let i=0;i<hs.length;i+=400)await api('setStatus',hs.slice(i,i+400),'huy');
+    await refreshState();VA.plan=[];$('#vaSum').innerHTML='';$('#vaPrev').innerHTML='';$('#vaGoRow').classList.add('hide');toast('Đã đóng '+xs.length+' dòng, hủy '+hs.length+' dòng theo VA05')}
+  catch(e){toast('Lỗi: '+errMsg(e),true);b.disabled=false}};
+
+/* ---------- tin nhắn Zalo theo KD ---------- */
+$('#zaloRpt').onclick=async()=>{try{await getDM()}catch(e){toast('Lỗi: '+errMsg(e),true);return}
+  const L=buildL();if(!L.length){toast('Không có đơn đang giữ',true);return}
+  const kvs=[...new Set(L.map(x=>x.kv))].sort();const now=new Date();const ds=pad(now.getDate())+'/'+pad(now.getMonth()+1)+'/'+now.getFullYear();
+  const ov=openModal('<div class="dh">Tin nhắn Zalo theo KD</div><div class="db"><div class="row" style="margin-bottom:8px"><label class="fld" style="margin:0"><span>Khu vực</span><select id="zKv">'+kvs.map(k=>'<option>'+esc(k)+'</option>').join('')+'</select></label><span class="small muted">Không ghi số ngày chừa. Tag KD thủ công khi dán vào Zalo.</span></div><div id="zBox"></div></div><div class="df"><button class="btn" data-x>Đóng</button><button class="btn pri" id="zAll">Sao chép tất cả</button></div>',true);
+  ov.querySelector('[data-x]').onclick=()=>ov.remove();
+  const txtOf=kv=>{const by=new Map();L.filter(x=>x.kv===kv).forEach(x=>{(by.get(x.kd)||by.set(x.kd,[]).get(x.kd)).push(x)});
+    return [...by.entries()].sort((a,b)=>a[0].localeCompare(b[0],'vi')).map(([kd,ls])=>{const st=new Map();ls.forEach(x=>{const k=x.ch+'|'+(x.so||x.no);(st.get(k)||st.set(k,[]).get(k)).push(x)});
+      return {kd,t:'📦 ĐƠN CHỪA '+kv.toUpperCase()+' – '+ds+'\n👤 KD: '+kd+' – '+st.size+' đơn\n'+[...st.values()].map(g=>'• '+g[0].ch+(g[0].so?' – ĐH '+g[0].so:'')+': '+g.map(x=>x.m+' ('+fmtN(x.q)+' '+x.u+')').join(', ')).join('\n')}})};
+  const draw=()=>{const blocks=txtOf(ov.querySelector('#zKv').value);ov._all=blocks.map(b=>b.t).join('\n\n');
+    ov.querySelector('#zBox').innerHTML=blocks.map((b,i)=>'<div class="card" style="margin-bottom:8px"><div class="row" style="justify-content:space-between"><b>'+esc(b.kd)+'</b><button class="btn sm" data-cp="'+i+'">Sao chép</button></div><textarea readonly style="min-height:110px;margin-top:6px">'+esc(b.t)+'</textarea></div>').join('');
+    ov.querySelectorAll('[data-cp]').forEach(btn=>btn.onclick=()=>copyTxt(blocks[+btn.dataset.cp].t))};
+  ov.querySelector('#zKv').onchange=draw;ov.querySelector('#zAll').onclick=()=>copyTxt(ov._all);draw()};
+function copyTxt(t){(navigator.clipboard?navigator.clipboard.writeText(t):Promise.reject()).then(()=>toast('Đã sao chép – dán vào Zalo')).catch(()=>showTextDialog('Sao chép tin nhắn',t))}
+
+/* ---------- tổng quan ---------- */
+async function renderDash(){const box=$('#dashBox');if(!S.sess){box.innerHTML='';return}
+  try{await getDM()}catch(e){box.innerHTML='<div class="empty">Không tải được danh mục: '+esc(errMsg(e))+'</div>';return}
+  const L=buildL();const uniq=f=>new Set(L.map(f)).size;
+  const grp=(key)=>{const m=new Map();L.forEach(x=>{const k=key(x);let g=m.get(k);if(!g){g={k,n:0,don:new Set(),ch:new Set()};m.set(k,g)}g.n++;g.don.add(x.so||x.no);g.ch.add(x.ch)});return [...m.values()].sort((a,b)=>b.n-a.n)};
+  const tbl=(title,h,rows)=>'<div class="card"><h2>'+title+'</h2><div class="tw" style="max-height:340px"><table><thead><tr>'+h.map((x,i)=>'<th'+(i?' class="n"':'')+'>'+x+'</th>').join('')+'</tr></thead><tbody>'+rows.join('')+'</tbody></table></div></div>';
+  const kvR=grp(x=>x.kv).map(g=>'<tr><td>'+esc(g.k)+'</td><td class="n">'+g.don.size+'</td><td class="n">'+g.ch.size+'</td><td class="n">'+g.n+'</td></tr>');
+  const kdR=grp(x=>x.kv+' · '+x.kd).slice(0,30).map(g=>'<tr><td>'+esc(g.k)+'</td><td class="n">'+g.don.size+'</td><td class="n">'+g.ch.size+'</td><td class="n">'+g.n+'</td></tr>');
+  const mm=new Map();L.forEach(x=>{let g=mm.get(x.m);if(!g){g={m:x.m,d:x.d,n:0,ch:new Set(),u:{}};mm.set(x.m,g)}g.n++;g.ch.add(x.ch);g.u[x.u]=r3((g.u[x.u]||0)+x.q)});
+  const topM=[...mm.values()].sort((a,b)=>b.ch.size-a.ch.size||b.n-a.n).slice(0,15).map(g=>'<tr><td><b>'+esc(g.m)+'</b> <span class="small muted">'+esc(g.d)+'</span></td><td class="n">'+g.ch.size+'</td><td class="n">'+g.n+'</td><td class="n">'+Object.entries(g.u).map(([u,q])=>fmtN(q)+' '+esc(u)).join(' · ')+'</td></tr>');
+  const low=[];for(const [k,x] of S.resv){const r=S.stockByKey.get(k);if(!r)continue;const base=baseOf(r);const a=availOf(k);if(base>0&&a<=base*0.1+0.0005)low.push({r,a,h:x.q,base})}
+  low.sort((a,b)=>a.a-b.a||b.h-a.h);
+  const lowR=low.slice(0,20).map(x=>'<tr><td><b>'+esc(x.r.m)+'</b> <span class="small muted">'+esc(x.r.d)+'</span></td><td class="n">'+esc(x.r.p)+'</td><td class="n">'+esc(x.r.b)+'</td><td class="n">'+fmtN(x.base)+'</td><td class="n">'+fmtN(x.h)+'</td><td class="n av '+avCls(x.a)+'">'+fmtN(x.a)+'</td></tr>');
+  box.innerHTML='<div class="stats"><div class="stat"><b>'+uniq(x=>x.so||x.no)+'</b><span>đơn chừa</span></div><div class="stat"><b>'+uniq(x=>x.ch)+'</b><span>cửa hàng / khách</span></div><div class="stat"><b>'+uniq(x=>x.m)+'</b><span>mã hàng</span></div><div class="stat"><b>'+L.length+'</b><span>dòng đang giữ</span></div><div class="stat"><b style="color:'+(low.length?'var(--warn)':'inherit')+'">'+low.length+'</b><span>lô sắp hết (≤10% còn khả dụng)</span></div></div>'+
+    '<div class="grid2">'+tbl('Theo khu vực',['Khu vực','Số đơn','Cửa hàng','Dòng'],kvR)+tbl('Theo KD (30 nhiều nhất)',['KV · KD','Số đơn','Cửa hàng','Dòng'],kdR)+'</div>'+
+    tbl('Mã được chừa nhiều nhất',['Mã hàng','Số cửa hàng','Dòng','Số lượng giữ'],topM)+
+    tbl('Lô sắp hết khả dụng (đang có đơn giữ)',['Mã hàng','Kho','Lô','Hàng có sẵn','Đang giữ','Khả dụng'],lowR.length?lowR:['<tr><td colspan="6" class="muted">Không có lô nào sắp hết.</td></tr>'])+
+    '<div class="row"><button class="btn ok" id="dashExp">Xuất Excel báo cáo</button><button class="btn" id="dashZalo">Tin nhắn Zalo theo KD</button></div>';
+  $('#dashExp').onclick=()=>exportReport();$('#dashZalo').onclick=()=>$('#zaloRpt').click()}
+
+/* ---------- quét mã vạch (điện thoại) ---------- */
+if('BarcodeDetector' in window&&navigator.mediaDevices){$('#scanBtn').classList.remove('hide');
+  $('#scanBtn').onclick=async()=>{let stream;try{stream=await navigator.mediaDevices.getUserMedia({video:{facingMode:'environment'}})}catch(e){toast('Không mở được camera: '+errMsg(e),true);return}
+    const ov=openModal('<div class="dh">Quét mã vạch</div><div class="db"><video id="scanV" playsinline muted style="width:100%;border-radius:8px;background:#000"></video><div class="small muted" style="margin-top:6px">Đưa mã vạch / QR của mã hàng hoặc lô vào khung hình.</div></div><div class="df"><button class="btn" data-x>Đóng</button></div>');
+    const v=ov.querySelector('#scanV');v.srcObject=stream;await v.play().catch(()=>{});let det;try{det=new BarcodeDetector()}catch(e){}
+    let alive=true;const stop=()=>{alive=false;stream.getTracks().forEach(t=>t.stop());ov.remove()};ov.querySelector('[data-x]').onclick=stop;
+    const loop=async()=>{if(!alive)return;try{const r=det&&await det.detect(v);if(r&&r.length){const val=r[0].rawValue;stop();const q=$('#q');q.value=val;q.dispatchEvent(new Event('input'));if(S.tab!=='stock')switchTab('stock');toast('Đã quét: '+val);return}}catch(e){}setTimeout(loop,300)};loop()}}
+
 /* ---------- server API (Google Apps Script) ---------- */
 function errMsg(e){return String(e&&e.message||e).replace(/^Error:\s*/,'').replace(/^Exception:\s*/,'')}
 const API_URL='https://script.google.com/macros/s/AKfycbw1zTYsOKPKN99DqJ7Zpojy09hxw564lOf4Vp60gorNlLIifSat9PXhwlEDxAKRXxKf/exec';
@@ -745,7 +891,7 @@ function callServer(fn,args){
 function api(fn,...args){
   return callServer(fn,fn==='login'?args:[S.sess&&S.sess.token].concat(args))
     .then(v=>{if(S.offline){S.offline=false;renderGlobal()}return v},
-      e=>{const m=errMsg(e);if(m.indexOf('SESSION_EXPIRED')>=0){sessionExpired();throw new Error('Phiên đăng nhập đã hết hạn, vui lòng đăng nhập lại')}
+      e=>{const m=errMsg(e);if(m.indexOf('DOI_MAT_KHAU')>=0){setTimeout(()=>openPw(true),50);throw new Error('Cần đổi mật khẩu trước khi giữ hàng')}if(m.indexOf('SESSION_EXPIRED')>=0){sessionExpired();throw new Error('Phiên đăng nhập đã hết hạn, vui lòng đăng nhập lại')}
         if(/Failed to fetch|NetworkError|Load failed/i.test(m))throw new Error('Không kết nối được máy chủ, kiểm tra mạng rồi thử lại');throw new Error(m)})}
 function showLogin(msg){$('#loginOv').classList.remove('hide');$('#lgErr').textContent=msg||'';setTimeout(()=>$('#lgUser').focus(),50)}
 function sessionExpired(){if(!S.sess)return;S.sess=null;try{localStorage.removeItem('tk_sess')}catch(e){}stopPoll();renderAll();showLogin('Phiên đăng nhập đã hết hạn, vui lòng đăng nhập lại.')}
@@ -754,8 +900,8 @@ async function doLogout(){const t=S.sess&&S.sess.token;S.sess=null;try{localStor
 $('#loginForm').addEventListener('submit',async e=>{e.preventDefault();const b=$('#lgBtn');b.disabled=true;b.textContent='Đang đăng nhập…';$('#lgErr').textContent='';
   try{const s=await api('login',$('#lgUser').value,$('#lgPass').value);startSession(s)}catch(err){$('#lgErr').textContent=errMsg(err)}
   finally{b.disabled=false;b.textContent='Đăng nhập'}});
-function startSession(s){S.sess=s;S.canWrite=s.role!=='xem';try{localStorage.setItem('tk_sess',JSON.stringify(s))}catch(e){}
-  $('#loginOv').classList.add('hide');$('#lgPass').value='';renderAll();loadStock(false);refreshState();startPoll()}
+function startSession(s){S.sess=s;S.canWrite=canW(s.role);try{localStorage.setItem('tk_sess',JSON.stringify(s))}catch(e){}
+  $('#loginOv').classList.add('hide');$('#lgPass').value='';renderAll();loadStock(false);refreshState();startPoll();if(s.mustChange)setTimeout(()=>openPw(true),300);setTimeout(()=>callServer('autoJobs',[s.token]).catch(()=>{}),8000)}
 let loadingStock=false;
 async function loadStock(force){if(!S.sess||loadingStock)return;loadingStock=true;if(force)toast('Đang tải lại tồn kho…');
   try{const o=JSON.parse(await api('getStock',!!force));const rows=[];
@@ -768,7 +914,7 @@ async function loadStock(force){if(!S.sess||loadingStock)return;loadingStock=tru
 let stateBusy=false;
 async function refreshState(){if(!S.sess||stateBusy)return;stateBusy=true;
   try{const st=await api('getState');S.orders=st.orders||[];S.ordersLoaded=true;rebuildResv();
-    if(st.me){S.sess=Object.assign({},S.sess,{name:st.me.name,role:st.me.role});S.canWrite=st.me.role!=='xem'}
+    if(st.me){S.sess=Object.assign({},S.sess,{name:st.me.name,role:st.me.role,kd:st.me.kd,mustChange:st.me.mustChange});S.canWrite=canW(st.me.role);if(st.me.role==='kd'&&!S.dm)getDM().then(()=>renderAll()).catch(()=>{})}
     if(st.stockLu&&S.stockLu&&st.stockLu!==S.stockLu)loadStock(false);
     renderAll()}
   catch(e){if(S.sess&&!/hết hạn/.test(errMsg(e))){S.offline=true;renderGlobal()}}
@@ -784,7 +930,7 @@ renderAll();
 try{const t=localStorage.getItem('tk_tab');if(t&&document.getElementById('tab-'+t))switchTab(t)}catch(e){}
 (function boot(){
   let saved=null;try{saved=JSON.parse(localStorage.getItem('tk_sess')||'null')}catch(e){}
-  if(saved&&saved.token){S.sess=saved;S.canWrite=saved.role!=='xem';renderAll();
+  if(saved&&saved.token){S.sess=saved;S.canWrite=canW(saved.role);renderAll();
     api('whoami').then(me=>{startSession(Object.assign({},saved,me))}).catch(()=>{if(!S.sess)return;S.sess=null;renderAll();showLogin()})}
   else showLogin();
 })();
