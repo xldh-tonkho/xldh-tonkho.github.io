@@ -97,7 +97,8 @@ table.sap td{border:1px solid #d3dce6;padding:3px 7px;height:22px}
 table.sap tbody tr:nth-child(odd) td{background:#ffffff}
 table.sap tbody tr:nth-child(even) td{background:#eef4fb}
 table.sap tbody tr.click:hover td{background:#fff3c4}
-table.sap tbody tr.hasheld td.held{background:#e3edff}
+table.sap tbody tr.hasheld td.held{background:#e3edff;cursor:pointer;text-decoration:underline dotted;text-underline-offset:3px}
+table.sap tbody tr.hasheld td.held:hover{background:#cfe0ff}
 table.sap td.mat{font-weight:400}
 table.sap td.desc{min-width:180px;max-width:300px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 table.sap td.av{font-weight:700}
@@ -197,7 +198,7 @@ table.sap td.av{font-weight:700}
       <p><b>Khả dụng = Hàng có sẵn − Tồn có đơn hàng</b>, tính riêng cho từng Plant × Mat. × Stor. Loc. × Màu × Batch.</p>
       <ul>
         <li><b>Hàng có sẵn</b>: đọc thẳng từ Google Sheet “Thông tin tồn kho”. App tự đọc lại mỗi 10 phút; vừa cập nhật Sheet xong muốn thấy ngay thì bấm <b>Tải lại</b> (góc trên bên phải).</li>
-        <li><b>Tồn có đơn hàng</b>: tổng các đơn XLĐH đang giữ trong app (lưu ở trang <b>DonGiu</b> của file app).</li>
+        <li><b>Tồn có đơn hàng</b>: tổng các đơn XLĐH đang giữ trong app (lưu ở trang <b>DonGiu</b> của file app). <b>Bấm vào số này</b> để xem ai đang giữ: người giữ, KD, CH / khách, số đơn SAP, số lượng, ngày giữ.</li>
         <li>Cột “Khả dụng SAP” chỉ để tham khảo.</li>
       </ul>
       <h3>Khi có đơn · Giữ hàng</h3>
@@ -367,7 +368,7 @@ function renderStock(){
     case 'b':return '<td>'+esc(x.b)+(x.gone?' <span class="pill bad">hết trên SAP</span>':'')+'</td>';
     case 'q':return '<td class="n">'+fmtN(x.q)+'</td>';
     case 'a0':return '<td class="n">'+(x.a0==null?'':fmtN(x.a0))+'</td>';
-    case 'h':return '<td class="n held">'+(x.h?fmtN(x.h):'')+'</td>';
+    case 'h':return '<td class="n held"'+(x.h?' title="Bấm để xem ai đang giữ"':'')+'>'+(x.h?fmtN(x.h):'')+'</td>';
     case 'a':return '<td class="n av '+avCls(x.a)+'">'+fmtN(x.a)+'</td>';
     case 'lots':return '<td class="n">'+x.lots+'</td>';
     default:return '<td>'+esc(x[f])+'</td>'}};
@@ -393,13 +394,22 @@ function nameOf(id){return id?'· bởi '+id:''}
 function wantNames(){}
 
 /* ---------- hold dialog + cart ---------- */
+function heldList(k,mode){if(mode==='mat'){const sep=String.fromCharCode(1);const a=String(k).split(sep);return S.orders.filter(o=>o.m===a[0]&&o.p===a[1])}return (S.resv.get(k)||{list:[]}).list}
+function showHeld(k,mode){const list=heldList(k,mode).slice().sort((a,b)=>String(b.createdAt).localeCompare(String(a.createdAt)));if(!list.length)return;
+  const o0=list[0];const mat=mode==='mat';const tot=r3(list.reduce((t,o)=>t+(+o.qty||0),0));
+  const ov=openModal('<div class="dh"><span>Ai đang giữ · '+esc(o0.m)+(mat?'':' · Lô '+esc(o0.b||'—'))+'</span><span class="muted small">'+esc(o0.p)+(o0.n?' '+esc(o0.n):'')+'</span></div><div class="db">'+
+    '<div class="small" style="margin-bottom:8px">'+esc(o0.d)+' — tổng đang giữ <b class="held">'+fmtN(tot)+' '+esc(o0.u)+'</b> ('+list.length+' dòng)</div>'+
+    '<div class="tw" style="max-height:380px"><table><thead><tr><th>Người giữ</th><th>KD</th><th>CH / khách</th><th>Số SAP</th>'+(mat?'<th>Lô</th>':'')+'<th class="n">SL</th><th>Ngày giữ</th><th>Ghi chú</th></tr></thead><tbody>'+
+    list.map(o=>'<tr><td><b>'+esc(o.createdBy)+'</b></td><td>'+(o.kd?esc(o.kd):'<span class="muted">—</span>')+'</td><td>'+esc(o.ch)+'</td><td>'+esc(o.so)+'</td>'+(mat?'<td>'+esc(o.b)+'</td>':'')+'<td class="n">'+fmtN(o.qty)+'</td><td>'+esc(fmtDT(o.createdAt))+'</td><td class="small">'+esc(o.note)+'</td></tr>').join('')+
+    '</tbody></table></div></div><div class="df"><button class="btn" data-x>Đóng</button></div>',true);
+  ov.querySelector('[data-x]').onclick=()=>ov.remove()}
 function openHold(k){
   let r=S.stockByKey.get(k);
   if(!r){const x=S.resv.get(k);if(!x)return;const o=x.list[0];r={m:o.m,d:o.d,p:o.p,n:o.n||'',s:o.s,x:o.x||'',g:o.g||'',b:o.b,u:o.u,q:0,a0:0,k}}
   const h=heldOf(k);const inCart=S.cart.filter(c=>c.k===k).reduce((s,c)=>s+c.qty,0);const base=baseOf(r);const a=r3(base-h-inCart);const Lb=L();
   const list=(S.resv.get(k)||{list:[]}).list;
-  const lh=list.length?'<h3 style="margin:4px 0 6px;font-size:13px">Đang giữ trên lô này</h3><div class="tw" style="max-height:160px;margin-bottom:12px"><table><thead><tr><th>CH / khách</th><th>KD</th><th class="n">SL</th><th>Ngày</th></tr></thead><tbody>'+
-    list.map(o=>'<tr><td>'+esc(o.ch)+'</td><td>'+esc(o.kd)+'</td><td class="n">'+fmtN(o.qty)+'</td><td>'+esc(fmtDT(o.createdAt))+'</td></tr>').join('')+'</tbody></table></div>':'';
+  const lh=list.length?'<h3 style="margin:4px 0 6px;font-size:13px">Đang giữ trên lô này</h3><div class="tw" style="max-height:160px;margin-bottom:12px"><table><thead><tr><th>Người giữ</th><th>KD</th><th>CH / khách</th><th class="n">SL</th><th>Ngày</th></tr></thead><tbody>'+
+    list.map(o=>'<tr><td><b>'+esc(o.createdBy)+'</b></td><td>'+(o.kd?esc(o.kd):'<span class="muted">—</span>')+'</td><td>'+esc(o.ch)+'</td><td class="n">'+fmtN(o.qty)+'</td><td>'+esc(fmtDT(o.createdAt))+'</td></tr>').join('')+'</tbody></table></div>':'';
   const ro=S.canWrite===false;
   const ov=openModal('<div class="dh"><span>'+esc(r.m)+' · Lô '+esc(r.b||'—')+(r.x?' · '+esc(L().x)+' '+esc(r.x):'')+'</span><span class="muted small">'+esc(r.p)+(r.n?' '+esc(r.n):'')+(r.s?' / '+esc(r.s):'')+'</span></div><div class="db">'+
     '<div class="small" style="margin-bottom:10px">'+esc(r.d)+'</div>'+
@@ -570,6 +580,7 @@ $('#mode').addEventListener('click',e=>{const b=e.target.closest('button');if(!b
 $('#more').onclick=()=>{S.view.limit+=300;renderStock()};
 $('#stockTable').addEventListener('click',e=>{const th=e.target.closest('th[data-sort]');if(th){const f=th.dataset.sort;if(S.view.sort===f)S.view.dir*=-1;else{S.view.sort=f;S.view.dir=['q','h','a','lots'].includes(f)?-1:1}renderStock();return}
   const tr=e.target.closest('tr[data-k]');if(!tr)return;
+  const hc=e.target.closest('td.held');if(hc&&hc.textContent.trim()){showHeld(tr.dataset.k,tr.dataset.mode);return}
   if(tr.dataset.mode==='mat'){const [m,p]=tr.dataset.k.split('\u0001');S.view.mode='lot';document.querySelectorAll('#mode button').forEach(x=>x.classList.toggle('on',x.dataset.m==='lot'));
     $('#q').value=m;S.view.q=m;if(p){$('#fPlant').value=p;S.view.plant=p}renderStock();return}
   openHold(tr.dataset.k)});
