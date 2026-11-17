@@ -162,6 +162,7 @@ table.sap td.av{font-weight:700}
         <button class="btn bad" id="bulkCancel">Hủy tất cả đơn đang lọc</button>
         <button class="btn bad" id="maCancel" style="display:none">Hủy theo mã hàng (admin)</button>
         <button class="btn" id="zaloRpt">Tin nhắn Zalo theo KD</button>
+        <button class="btn pri" id="imgRpt">Xuất hình báo cáo</button>
       </div>
     </div>
     <div id="selBar"></div>
@@ -928,6 +929,64 @@ $('#zaloRpt').onclick=async()=>{try{await getDM()}catch(e){toast('Lỗi: '+errMs
     ov.querySelector('#zBox').innerHTML=blocks.map((b,i)=>'<div class="card" style="margin-bottom:8px"><div class="row" style="justify-content:space-between"><b>'+esc(b.kd)+'</b><button class="btn sm" data-cp="'+i+'">Sao chép</button></div><textarea readonly style="min-height:110px;margin-top:6px">'+esc(b.t)+'</textarea></div>').join('');
     ov.querySelectorAll('[data-cp]').forEach(btn=>btn.onclick=()=>copyTxt(blocks[+btn.dataset.cp].t))};
   ov.querySelector('#zKv').onchange=draw;ov.querySelector('#zAll').onclick=()=>copyTxt(ov._all);draw()};
+/* ---------- xuất hình báo cáo (thẻ theo KD) ---------- */
+const STOPW=new Set(['cty','công','cong','ty','công ty','tnhh','tnhhh','cp','mtv','hkd','dntn','ch','và','va','&','-','–','hộ','kinh','doanh']);
+function shortCh(s){s=String(s||'').split(String.fromCharCode(8203)).join('').trim();if(/^showroom\s/i.test(s))return 'SR '+s.replace(/^showroom\s+/i,'');
+  const t=s.split(/\s+/);let i=0;while(i<t.length-1&&(STOPW.has(t[i].toLowerCase())||(t[i].length<=6&&t[i]===t[i].toUpperCase()&&/[A-ZĐ]/.test(t[i]))))i++;
+  const r=t.slice(i).join(' ');return r&&r!==r.toUpperCase()?r:s.replace(/^(công ty|cty)\s+/i,'')}
+const shortMa=(d,m)=>{const c=String(d||'').split(',')[1];return c?c.trim().split('-')[0]:(m||'')};
+const unitLbl=u=>({TH:'th',VIE:'v',PAC:'gói',BAO:'bao',CAI:'cái',M2:'m2'})[String(u).toUpperCase()]||String(u||'').toLowerCase();
+function imgData(L){const by=new Map();L.forEach(x=>{const kd=x.kd||'Chưa có KD';if(!by.has(kd))by.set(kd,new Map());const cm=by.get(kd);const c=shortCh(x.ch);if(!cm.has(c))cm.set(c,{name:c,it:new Map(),notes:new Set()});const g=cm.get(c);
+    const k=shortMa(x.d,x.m)+'|'+x.u;g.it.set(k,(g.it.get(k)||0)+x.q);if(x.note)g.notes.add(x.note)});
+  return [...by.entries()].sort((a,b)=>a[0].localeCompare(b[0],'vi')).map(([kd,cm])=>{const cs=[...cm.values()].sort((a,b)=>a.name.localeCompare(b.name,'vi'));
+    return {kd,cs:cs.map(c=>({name:c.name,notes:[...c.notes],it:[...c.it.entries()].map(([k,q])=>{const[m,u]=k.split('|');return m+': '+fmtN(q)+' '+unitLbl(u)})})),nKh:cs.length,nMa:cs.reduce((a,c)=>a+c.it.size,0)}})}
+function drawReport(data,area,ds,title,cols){
+  const SC=2,W=340,G=16,PAD=20,F='"Segoe UI",Roboto,Arial,sans-serif';const cv=document.createElement('canvas');const ctx=cv.getContext('2d');
+  const wrap=(parts,maxW,font,sep)=>{ctx.font=font;const out=[];let cur='';parts.forEach(p=>{const t=cur?cur+sep+p:p;if(ctx.measureText(t).width<=maxW||!cur)cur=t;else{out.push(cur);cur=p}});if(cur)out.push(cur);
+    return out.flatMap(l=>{if(ctx.measureText(l).width<=maxW)return [l];const w=l.split(' ');const o=[];let c='';w.forEach(x=>{const t=c?c+' '+x:x;if(ctx.measureText(t).width<=maxW||!c)c=t;else{o.push(c);c=x}});if(c)o.push(c);return o})};
+  const fB='bold 14px '+F,fI='13px '+F,fN='italic 12px '+F,inW=W-28;
+  const lay=data.map(k=>{let h=58+10;const body=k.cs.map(c=>{const nm=wrap([c.name],inW,fB,' ');const it=wrap(c.it,inW-12,fI,'  ·  ');const nt=c.notes.length?wrap(['Ghi chú: '+c.notes.join('; ')],inW-12,fN,' '):[];const hh=nm.length*19+it.length*18+nt.length*17+8;h+=hh;return {nm,it,nt}});h+=10+40+12;return {k,body,h}});
+  const nc=Math.max(1,Math.min(cols||3,lay.length));const colH=Array(nc).fill(0);const pos=lay.map(c=>{const i=colH.indexOf(Math.min(...colH));const y=colH[i];colH[i]+=c.h+G;return {c,x:PAD+i*(W+G),y}});
+  const TH=58,totW=PAD*2+nc*W+(nc-1)*G,totH=TH+Math.max(...colH)-G+PAD;cv.width=totW*SC;cv.height=totH*SC;ctx.scale(SC,SC);
+  ctx.fillStyle='#eef1f6';ctx.fillRect(0,0,totW,totH);ctx.fillStyle='#173a7a';ctx.textBaseline='alphabetic';
+  const tl=wrap([title],totW-PAD*2,'bold 22px '+F,' ');ctx.font='bold 22px '+F;ctx.fillText(tl[0],PAD,36);
+  const rr=(x,y,w,h,r,tl,tr,br,bl)=>{ctx.beginPath();ctx.moveTo(x+(tl?r:0),y);ctx.lineTo(x+w-(tr?r:0),y);tr?ctx.arcTo(x+w,y,x+w,y+r,r):0;ctx.lineTo(x+w,y+h-(br?r:0));br?ctx.arcTo(x+w,y+h,x+w-r,y+h,r):0;ctx.lineTo(x+(bl?r:0),y+h);bl?ctx.arcTo(x,y+h,x,y+h-r,r):0;ctx.lineTo(x,y+(tl?r:0));tl?ctx.arcTo(x,y,x+r,y,r):0;ctx.closePath()};
+  pos.forEach(({c,x,y})=>{y+=TH;const k=c.k;ctx.save();ctx.shadowColor='rgba(16,24,40,.12)';ctx.shadowBlur=8;ctx.shadowOffsetY=2;ctx.fillStyle='#fff';rr(x,y,W,c.h,8,1,1,1,1);ctx.fill();ctx.restore();
+    ctx.fillStyle='#1d4f9c';rr(x,y,W,58,8,1,1,0,0);ctx.fill();
+    ctx.fillStyle='#fff';const hd='ĐƠN TỒN ĐỘNG · KD '+k.kd.toUpperCase();let fs=15;ctx.font='bold '+fs+'px '+F;while(ctx.measureText(hd).width>W-28&&fs>10){fs--;ctx.font='bold '+fs+'px '+F}ctx.fillText(hd,x+14,y+26);
+    ctx.font='bold 12px '+F;const right=k.nKh+' khách · '+k.nMa+' mã';ctx.fillText(right,x+W-14-ctx.measureText(right).width,y+46);
+    ctx.font='11px '+F;ctx.fillStyle='rgba(255,255,255,.85)';ctx.fillText(area+' · '+ds,x+14,y+46);
+    let cy=y+58+10+14;c.body.forEach(b=>{ctx.fillStyle='#111827';ctx.font=fB;b.nm.forEach(l=>{ctx.fillText(l,x+14,cy);cy+=19});
+      ctx.font=fI;ctx.fillStyle='#374151';b.it.forEach((l,i)=>{if(i===0){ctx.fillStyle='#6b7280';ctx.fillText('•',x+16,cy-1);ctx.fillStyle='#374151'}ctx.fillText(l,x+26,cy);cy+=18});
+      ctx.font=fN;ctx.fillStyle='#1d4f9c';b.nt.forEach(l=>{ctx.fillText(l,x+26,cy);cy+=17});cy+=8});
+    const fy=y+c.h-12-40;ctx.fillStyle='#fde7e7';rr(x+12,fy,W-24,40,6,1,1,1,1);ctx.fill();ctx.fillStyle='#c62828';ctx.font='bold 13px '+F;const ft='KD nhắc khách lấy hàng nha';ctx.fillText(ft,x+W/2-ctx.measureText(ft).width/2,fy+25)});
+  return cv}
+function cvBlob(cv){return new Promise(r=>cv.toBlob(r,'image/png'))}
+async function copyCv(cv){try{const b=await cvBlob(cv);await navigator.clipboard.write([new ClipboardItem({'image/png':b})]);toast('Đã sao chép hình – dán (Ctrl+V) vào Zalo')}catch(e){toast('Trình duyệt không cho sao chép hình – bấm Tải PNG rồi gửi file',true)}}
+function dlCv(cv,fn){const a=document.createElement('a');a.download=fn;a.href=cv.toDataURL('image/png');document.body.appendChild(a);a.click();a.remove()}
+$('#imgRpt').onclick=async()=>{try{await getDM()}catch(e){}
+  const terms=norm($('#oq').value).split(/\s+/).filter(Boolean);
+  const os=visOrders().filter(ordFilter).filter(o=>!terms.length||terms.every(t=>norm([o.orderNo,o.ch,o.kd,o.so,o.m,o.d,o.b,o.note,o.createdBy].join(' ')).includes(t)));
+  if(!os.length){toast('Không có đơn nào đang lọc',true);return}
+  const L=os.map(o=>{const r=resolveO(o);return {kv:r.kv||'',kd:r.kd||o.kd||'',ch:o.ch||'',m:o.m,d:o.d,u:o.u||'',q:+o.qty||0,note:o.note||''}});
+  const kvs=[...new Set(L.map(x=>x.kv||'(chưa rõ khu vực)'))].sort();const now=new Date();const ds=pad(now.getDate())+'/'+pad(now.getMonth()+1)+'/'+now.getFullYear();
+  const ov=openModal('<div class="dh">Xuất hình báo cáo đơn tồn động</div><div class="db"><div class="small muted" style="margin-bottom:8px">Lấy theo bộ lọc đang chọn ('+os.length+' dòng). Muốn ra hình riêng thì lọc trước theo người giữ / KD / tìm kiếm.</div>'+
+    '<div class="row" style="margin-bottom:8px"><label class="fld" style="margin:0"><span>Khu vực</span><select id="irKv">'+(kvs.length>1?'<option value="*">Tất cả khu vực</option>':'')+kvs.map(k=>'<option>'+esc(k)+'</option>').join('')+'</select></label>'+
+    '<label class="fld grow" style="margin:0"><span>Tên khu vực in trên hình</span><input type="text" id="irArea"></label><label class="fld" style="margin:0"><span>Số cột</span><select id="irCols"><option>1</option><option>2</option><option selected>3</option><option>4</option></select></label></div>'+
+    '<div id="irBox" style="max-height:60vh;overflow:auto;background:#eef1f6;border-radius:8px;padding:8px;text-align:center"></div><div id="irKds" style="margin-top:8px"></div></div>'+
+    '<div class="df"><button class="btn" data-x>Đóng</button><button class="btn" id="irDl">Tải PNG</button><button class="btn pri" id="irCp">Sao chép hình</button></div>',true);
+  ov.querySelector('[data-x]').onclick=()=>ov.remove();const kvSel=ov.querySelector('#irKv'),ar=ov.querySelector('#irArea');
+  const setArea=()=>{const v=kvSel.value;ar.value=v==='*'||v==='(chưa rõ khu vực)'?(localStorage.getItem('irArea')||'KV27 Cần Thơ'):v};setArea();
+  let cv=null,cards=[];
+  const draw=()=>{const v=kvSel.value;const LL=L.filter(x=>v==='*'||(x.kv||'(chưa rõ khu vực)')===v);const area=ar.value.trim()||'Khu vực';const data=imgData(LL);
+    const title='ĐƠN HÀNG ĐANG TỒN ĐỘNG – '+area.toUpperCase()+' · KD nhắc khách lấy hàng nha';
+    cv=drawReport(data,area,ds,title,+ov.querySelector('#irCols').value);cv.style.maxWidth='100%';cv.style.height='auto';const box=ov.querySelector('#irBox');box.innerHTML='';box.appendChild(cv);
+    cards=data.map(k=>({kd:k.kd,cv:drawReport([k],area,ds,'ĐƠN TỒN ĐỘNG – '+area.toUpperCase()+' · KD '+k.kd,1)}));
+    ov.querySelector('#irKds').innerHTML=data.length>1?'<div class="small muted" style="margin-bottom:4px">Hình riêng từng KD (để gửi riêng):</div><div class="row">'+cards.map((c,i)=>'<span class="pill info" style="gap:6px;display:inline-flex;align-items:center">'+esc(c.kd)+' <button class="btn sm" data-kc="'+i+'">Sao chép</button><button class="btn sm" data-kd="'+i+'">Tải</button></span>').join('')+'</div>':'';
+    ov.querySelectorAll('[data-kc]').forEach(b=>b.onclick=()=>copyCv(cards[+b.dataset.kc].cv));
+    ov.querySelectorAll('[data-kd]').forEach(b=>b.onclick=()=>dlCv(cards[+b.dataset.kd].cv,'DonTonDong_KD_'+cards[+b.dataset.kd].kd.replace(/\s+/g,'_')+'_'+ds.replace(/\//g,'-')+'.png'))};
+  kvSel.onchange=()=>{setArea();draw()};ov.querySelector('#irCols').onchange=draw;let t=null;ar.oninput=()=>{try{localStorage.setItem('irArea',ar.value)}catch(e){}clearTimeout(t);t=setTimeout(draw,300)};
+  ov.querySelector('#irDl').onclick=()=>dlCv(cv,'DonTonDong_'+ar.value.trim().replace(/\s+/g,'_')+'_'+ds.replace(/\//g,'-')+'.png');ov.querySelector('#irCp').onclick=()=>copyCv(cv);draw()};
 function copyTxt(t){(navigator.clipboard?navigator.clipboard.writeText(t):Promise.reject()).then(()=>toast('Đã sao chép – dán vào Zalo')).catch(()=>showTextDialog('Sao chép tin nhắn',t))}
 
 /* ---------- tổng quan ---------- */
