@@ -156,6 +156,7 @@ table.sap td.av{font-weight:700}
         <button class="btn" id="bulkSo">Đóng theo danh sách số đơn SAP</button>
         <button class="btn" id="copyOrders">Sao chép danh sách</button>
         <button class="btn ok" id="exportRpt">Xuất Excel báo cáo</button>
+        <button class="btn bad" id="bulkCancel">Hủy tất cả đơn đang lọc</button>
         <button class="btn" id="zaloRpt">Tin nhắn Zalo theo KD</button>
       </div>
     </div>
@@ -642,6 +643,16 @@ $('#cartClear').onclick=async()=>{if(await confirmBox('Bỏ đơn đang soạn',
 $('#orderList').addEventListener('click',onOrdersClick);$('#reconcile').addEventListener('click',onOrdersClick);
 let oT=null;$('#oq').addEventListener('input',()=>{clearTimeout(oT);oT=setTimeout(renderOrders,150)});
 $('#oBy').onchange=renderOrders;$('#oKd').onchange=renderOrders;
+$('#bulkCancel').onclick=async()=>{if(!S.canWrite){toast('Tài khoản không có quyền hủy',true);return}
+  const terms=norm($('#oq').value).split(/\s+/).filter(Boolean);const list=visOrders().filter(ordFilter).filter(o=>!terms.length||terms.every(t=>norm([o.orderNo,o.ch,o.kd,o.so,o.m,o.d,o.b,o.note,o.createdBy].join(' ')).includes(t)));
+  if(!list.length){toast('Không có dòng nào đang lọc',true);return}
+  window._bcR='';const noFilter=!terms.length&&!$('#oBy').value&&!$('#oKd').value;const cnt=(f)=>{const m={};list.forEach(o=>{const k=f(o)||'—';m[k]=(m[k]||0)+1});return Object.entries(m).sort((a,b)=>b[1]-a[1]).slice(0,8).map(([k,n])=>esc(k)+': '+n).join(' · ')};
+  const desc=(noFilter?'<div class="banner bad" style="margin-bottom:8px">Bạn <b>chưa lọc gì</b> – sẽ hủy <b>TẤT CẢ</b> đơn đang giữ đang hiển thị.</div>':'')+'Sẽ hủy <b>'+list.length+'</b> dòng ('+new Set(list.map(o=>o.orderNo)).size+' đơn)'+ordFilterTxt()+(terms.length?' · tìm: “'+esc($('#oq').value)+'”':'')+'.<div class="small" style="margin-top:6px">Theo người giữ: '+cnt(o=>o.createdBy)+'<br>Theo kho: '+cnt(o=>o.p)+'</div><label class="fld" style="margin-top:8px"><span>Lý do (ghi vào ghi chú)</span><input type="text" id="bcReason" oninput="window._bcR=this.value" placeholder="Ví dụ: khách không lấy / lọc lại đơn chừa"></label>';
+  if(!await confirmBox('Hủy hàng loạt',desc,'Hủy '+list.length+' dòng',true,'Thôi',true))return;
+  if(noFilter&&!await confirmBox('Xác nhận lần 2','Hủy <b>toàn bộ '+list.length+' dòng</b> đang giữ? Thao tác này trả hàng về khả dụng ngay.','Vẫn hủy tất cả',true))return;
+  const reason=window._bcR||'';window._bcR='';const b=$('#bulkCancel');b.disabled=true;b.textContent='Đang hủy…';
+  try{const ids=list.map(o=>o.id);let n=0;for(let i=0;i<ids.length;i+=1500)n+=await api('bulkCancel',ids.slice(i,i+1500),reason);await refreshState();toast('Đã hủy '+n+' dòng')}
+  catch(e){toast('Lỗi: '+errMsg(e),true)}finally{b.disabled=false;b.textContent='Hủy tất cả đơn đang lọc'}};
 $('#bulkSo').onclick=openBulkSo;
 $('#copyOrders').onclick=()=>{const terms=norm($('#oq').value).split(/\s+/).filter(Boolean);const list=visOrders().filter(ordFilter).filter(o=>!terms.length||terms.every(t=>norm([o.orderNo,o.ch,o.kd,o.so,o.m,o.d,o.b,o.note,o.createdBy].join(' ')).includes(t)));
   copyText(ordersTSV(groupOrders(list).flatMap(g=>g.ls)))};
