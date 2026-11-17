@@ -66,6 +66,9 @@ tbody tr.click{cursor:pointer}tbody tr.click:hover{background:#f3f7fe}
 .ord .hd{display:flex;gap:10px;align-items:center;flex-wrap:wrap;padding:9px 12px;background:var(--soft);border-bottom:1px solid var(--line)}
 .ord .hd .t{font-weight:700}
 .ord .hd .sp{flex:1}
+.ord input.selL,.ord input.selG,#selBar input{width:17px;height:17px;cursor:pointer;accent-color:var(--bad);margin:0}
+.ord tr.picked td{background:#fdecea}
+#selBar .card{position:sticky;top:0;z-index:6;padding:8px 12px;margin-bottom:10px}
 .ord table td,.ord table th{border-bottom:1px solid #f0f2f5}
 .cartbar{position:fixed;left:50%;transform:translateX(-50%);bottom:16px;z-index:30;background:var(--ink);color:#fff;border-radius:12px;padding:10px 12px 10px 16px;display:flex;gap:12px;align-items:center;box-shadow:0 8px 24px rgba(16,24,40,.25)}
 .cartbar .btn{border-color:transparent}
@@ -161,6 +164,7 @@ table.sap td.av{font-weight:700}
         <button class="btn" id="zaloRpt">Tin nhắn Zalo theo KD</button>
       </div>
     </div>
+    <div id="selBar"></div>
     <div id="orderList"></div>
   </section>
 
@@ -296,7 +300,7 @@ function toast(msg,err){document.querySelectorAll('.toast').forEach(x=>x.remove(
 async function copyText(txt){try{await navigator.clipboard.writeText(txt);toast('Đã sao chép – dán vào Excel/Zalo được ngay')}catch(e){showTextDialog('Sao chép thủ công',txt)}}
 
 /* ---------- state ---------- */
-const S={db:null,user:null,meId:null,canWrite:null,canAdmin:false,
+const S={sel:new Set(),_olist:[],db:null,user:null,meId:null,canWrite:null,canAdmin:false,
   meta:null,metaLoaded:false,stock:[],stockByKey:new Map(),plants:[],slocs:[],
   orders:[],ordersLoaded:false,resv:new Map(),cart:[],names:{},
   view:{q:'',plant:'',sloc:'',onlyAvail:false,onlyHeld:false,mode:'lot',sort:'m',dir:1,limit:200},
@@ -540,17 +544,19 @@ function renderOrders(){
   fillOrdFilters();const q=norm($('#oq').value);const terms=q.split(/\s+/).filter(Boolean);
   const list=visOrders().filter(ordFilter).filter(o=>!terms.length||terms.every(t=>norm([o.orderNo,o.ch,o.kd,o.so,o.m,o.d,o.b,o.note,o.createdBy].join(' ')).includes(t)));
   const groups=groupOrders(list);wantNames(groups.map(g=>g.o.createdBy));
-  if(!groups.length){box.innerHTML='<div class="empty">'+(S.orders.length?'Không có đơn khớp bộ lọc.':'Chưa có đơn nào đang giữ hàng.')+'</div>';return}
+  {const live=new Set(S.orders.map(o=>o.id));for(const id of [...S.sel])if(!live.has(id))S.sel.delete(id)}S._olist=list.map(o=>o.id);
+  if(!groups.length){box.innerHTML='<div class="empty">'+(S.orders.length?'Không có đơn khớp bộ lọc.':'Chưa có đơn nào đang giữ hàng.')+'</div>';updateSelUI();return}
   const ro=S.canWrite===false;
   box.innerHTML=groups.map(g=>{const o=g.o;
-    return '<div class="ord"><div class="hd"><span class="t">'+esc(o.ch)+'</span>'+(o.kd?'<span class="pill info">KD '+esc(o.kd)+'</span>':'')+
+    return '<div class="ord"><div class="hd">'+(ro?'':'<input type="checkbox" class="selG" data-g="'+esc(g.no)+'" title="Chọn cả đơn">')+'<span class="t">'+esc(o.ch)+'</span>'+(o.kd?'<span class="pill info">KD '+esc(o.kd)+'</span>':'')+
       (o.so?'<span class="pill ok">SAP '+esc(o.so)+'</span>':'<span class="pill warn">Chưa có số SAP</span>')+
       '<span class="muted small">'+esc(g.no)+' · '+esc(fmtDT(o.createdAt))+' '+esc(nameOf(o.createdBy))+'</span>'+(o.note?'<span class="small">📝 '+esc(o.note)+'</span>':'')+'<span class="sp"></span>'+
       (ro?'':'<button class="btn sm" data-so="'+esc(g.no)+'">'+(o.so?'Sửa số SAP':'Nhập số SAP')+'</button><button class="btn sm bad" data-cancelall="'+esc(g.no)+'">Hủy đơn</button><button class="btn sm ok" data-closeall="'+esc(g.no)+'">'+doneLbl()+' cả đơn</button>')+
-      '</div><div style="overflow:auto"><table><thead><tr><th>Mã</th><th>Tên hàng</th><th>Kho</th><th>Lô</th><th class="n">SL giữ</th><th>ĐVT</th><th class="n">Khả dụng lô</th><th></th></tr></thead><tbody>'+
-      g.ls.map(l=>{const a=availOf(kOf(l));return '<tr><td><b>'+esc(l.m)+'</b></td><td class="desc">'+esc(l.d)+'</td><td>'+esc(l.p)+(l.s?' / '+esc(l.s):'')+'</td><td>'+esc(l.b)+'</td><td class="n held">'+fmtN(l.qty)+'</td><td>'+esc(l.u)+'</td><td class="n av '+avCls(a)+'">'+fmtN(a)+'</td><td>'+
+      '</div><div style="overflow:auto"><table><thead><tr>'+(ro?'':'<th style="width:26px"></th>')+'<th>Mã</th><th>Tên hàng</th><th>Kho</th><th>Lô</th><th class="n">SL giữ</th><th>ĐVT</th><th class="n">Khả dụng lô</th><th></th></tr></thead><tbody>'+
+      g.ls.map(l=>{const a=availOf(kOf(l));return '<tr'+(S.sel.has(l.id)?' class="picked"':'')+'>'+(ro?'':'<td><input type="checkbox" class="selL" data-id="'+esc(l.id)+'" data-g="'+esc(g.no)+'"'+(S.sel.has(l.id)?' checked':'')+'></td>')+'<td><b>'+esc(l.m)+'</b></td><td class="desc">'+esc(l.d)+'</td><td>'+esc(l.p)+(l.s?' / '+esc(l.s):'')+'</td><td>'+esc(l.b)+'</td><td class="n held">'+fmtN(l.qty)+'</td><td>'+esc(l.u)+'</td><td class="n av '+avCls(a)+'">'+fmtN(a)+'</td><td>'+
         (ro?'':'<button class="btn sm" data-edit="'+esc(l.id)+'">Sửa SL</button> <button class="btn sm bad" data-cancel="'+esc(l.id)+'">Hủy</button> <button class="btn sm ok" data-close="'+esc(l.id)+'">'+doneLbl()+'</button>')+'</td></tr>'}).join('')+
       '</tbody></table></div></div>'}).join('');
+  updateSelUI();
 }
 async function setStatus(ids,status){
   let ok=0;const now=new Date().toISOString();
@@ -678,6 +684,33 @@ function openMaCancel(){
     catch(e){ov.style.display='';b.disabled=false;b.textContent='Hủy các dòng khớp';toast('Lỗi: '+errMsg(e),true)}};
 }
 $('#maCancel').onclick=openMaCancel;
+/* ---------- chọn nhiều dòng để hủy ---------- */
+function updateSelUI(){const box=$('#orderList'),bar=$('#selBar');if(!box||!bar)return;const ro=S.canWrite===false;
+  box.querySelectorAll('input.selL').forEach(c=>{const on=S.sel.has(c.dataset.id);c.checked=on;const tr=c.closest('tr');if(tr)tr.classList.toggle('picked',on)});
+  box.querySelectorAll('input.selG').forEach(c=>{const ls=[...box.querySelectorAll('input.selL')].filter(x=>x.dataset.g===c.dataset.g);const n=ls.filter(x=>x.checked).length;c.checked=!!n&&n===ls.length;c.indeterminate=n>0&&n<ls.length});
+  const vis=S._olist||[];if(ro||!vis.length){bar.innerHTML=S.sel.size&&!ro?'<div class="card"><div class="row"><b>Đã chọn '+S.sel.size+' dòng</b> (không nằm trong bộ lọc hiện tại)<span style="flex:1"></span><button class="btn sm" id="selClr">Bỏ chọn</button><button class="btn sm bad" id="selDel">Hủy '+S.sel.size+' dòng đã chọn</button></div></div>':'';return}
+  const nv=vis.filter(id=>S.sel.has(id)).length;const hid=S.sel.size-nv;const nDon=new Set(S.orders.filter(o=>S.sel.has(o.id)).map(o=>o.orderNo)).size;
+  bar.innerHTML='<div class="card"><div class="row"><label style="display:flex;gap:8px;align-items:center;cursor:pointer;font-weight:600"><input type="checkbox" id="selAll"> Chọn tất cả '+vis.length+' dòng đang lọc</label><span style="flex:1"></span>'+
+    (S.sel.size?'<b>Đã chọn '+S.sel.size+' dòng ('+nDon+' đơn)</b>'+(hid?'<span class="small muted">'+hid+' dòng không nằm trong bộ lọc hiện tại</span>':'')+'<button class="btn sm" id="selClr">Bỏ chọn</button><button class="btn sm bad" id="selDel">Hủy '+S.sel.size+' dòng đã chọn</button>':'<span class="small muted">Tích ô vuông để chọn từng dòng hoặc cả đơn · giữ Shift để chọn liền một khoảng</span>')+'</div></div>';
+  const a=$('#selAll');a.checked=!!nv&&nv===vis.length;a.indeterminate=nv>0&&nv<vis.length}
+let _lastSel=null;
+$('#orderList').addEventListener('click',e=>{const c=e.target;if(!(c instanceof HTMLInputElement)||c.type!=='checkbox')return;
+  if(c.classList.contains('selL')){const all=[...$('#orderList').querySelectorAll('input.selL')];const i=all.indexOf(c);
+    if(e.shiftKey&&_lastSel!=null&&_lastSel<all.length){const[a,b]=[Math.min(i,_lastSel),Math.max(i,_lastSel)];for(let k=a;k<=b;k++)c.checked?S.sel.add(all[k].dataset.id):S.sel.delete(all[k].dataset.id)}
+    else c.checked?S.sel.add(c.dataset.id):S.sel.delete(c.dataset.id);_lastSel=i;updateSelUI()}
+  else if(c.classList.contains('selG')){const on=c.checked;$('#orderList').querySelectorAll('input.selL').forEach(x=>{if(x.dataset.g===c.dataset.g)on?S.sel.add(x.dataset.id):S.sel.delete(x.dataset.id)});updateSelUI()}});
+$('#selBar').addEventListener('click',async e=>{const t=e.target;
+  if(t.id==='selAll'){(S._olist||[]).forEach(id=>t.checked?S.sel.add(id):S.sel.delete(id));updateSelUI()}
+  else if(t.id==='selClr'){S.sel.clear();_lastSel=null;updateSelUI()}
+  else if(t.id==='selDel'){if(!S.canWrite){toast('Tài khoản không có quyền hủy',true);return}
+    const list=S.orders.filter(o=>S.sel.has(o.id));if(!list.length){S.sel.clear();updateSelUI();return}
+    const cnt=(f)=>{const m={};list.forEach(o=>{const k=f(o)||'—';m[k]=(m[k]||0)+1});return Object.entries(m).sort((a,b)=>b[1]-a[1]).slice(0,8).map(([k,n])=>esc(k)+': '+n).join(' · ')};
+    window._bcR='';
+    const desc='Hủy <b>'+list.length+'</b> dòng đã chọn ('+new Set(list.map(o=>o.orderNo)).size+' đơn)? Số lượng trả lại khả dụng ngay.<div class="small" style="margin-top:6px">Theo người giữ: '+cnt(o=>o.createdBy)+'<br>Theo CH / khách: '+cnt(o=>o.ch)+'<br>Theo kho: '+cnt(o=>o.p)+'</div><label class="fld" style="margin-top:8px"><span>Lý do (ghi vào ghi chú)</span><input type="text" oninput="window._bcR=this.value" placeholder="Ví dụ: khách không lấy / lọc lại đơn chừa"></label>';
+    if(!await confirmBox('Hủy các dòng đã chọn',desc,'Hủy '+list.length+' dòng',true,'Thôi',true))return;
+    const reason=window._bcR||'';window._bcR='';t.disabled=true;t.textContent='Đang hủy…';
+    try{const ids=list.map(o=>o.id);let n=0;for(let i=0;i<ids.length;i+=1500)n+=await api('bulkCancel',ids.slice(i,i+1500),reason);S.sel.clear();_lastSel=null;await refreshState();toast('Đã hủy '+n+' dòng đã chọn')}
+    catch(e){toast('Lỗi: '+errMsg(e),true);t.disabled=false;t.textContent='Hủy '+list.length+' dòng đã chọn'}}});
 $('#bulkSo').onclick=openBulkSo;
 $('#copyOrders').onclick=()=>{const terms=norm($('#oq').value).split(/\s+/).filter(Boolean);const list=visOrders().filter(ordFilter).filter(o=>!terms.length||terms.every(t=>norm([o.orderNo,o.ch,o.kd,o.so,o.m,o.d,o.b,o.note,o.createdBy].join(' ')).includes(t)));
   copyText(ordersTSV(groupOrders(list).flatMap(g=>g.ls)))};
