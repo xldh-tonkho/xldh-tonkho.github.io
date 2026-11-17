@@ -151,6 +151,8 @@ table.sap td.av{font-weight:700}
     <div class="card">
       <div class="row">
         <input type="search" id="oq" class="grow" placeholder="Lọc theo CH / khách, KD, mã hàng, số đơn SAP, mã giữ hàng…">
+        <select id="oBy" title="Lọc theo người giữ / người nhập"><option value="">Tất cả người giữ</option></select>
+        <select id="oKd" title="Lọc theo KD phụ trách"><option value="">Tất cả KD</option></select>
         <button class="btn" id="bulkSo">Đóng theo danh sách số đơn SAP</button>
         <button class="btn" id="copyOrders">Sao chép danh sách</button>
         <button class="btn ok" id="exportRpt">Xuất Excel báo cáo</button>
@@ -532,8 +534,8 @@ function renderOrders(){
   const iss=S.meta?issues():[];
   $('#reconcile').innerHTML=iss.length?'<div class="card" style="border-color:#f4c7c2"><h2 style="color:var(--bad)">Cần kiểm tra ('+iss.length+' dòng)</h2><div class="small muted" style="margin-bottom:8px">Sau lần cập nhật tồn SAP, các dòng dưới đây có thể đã xuất hàng trên SAP nhưng chưa đóng trong app (đang bị trừ 2 lần).</div><div class="tw"><table><thead><tr><th>Mã giữ</th><th>CH / khách</th><th>Mã</th><th>Lô</th><th>Kho</th><th class="n">SL</th><th>Số SAP</th><th>Lý do</th><th></th></tr></thead><tbody>'+
     iss.map(({o,why})=>'<tr><td>'+esc(o.orderNo)+'</td><td>'+esc(o.ch)+'</td><td><b>'+esc(o.m)+'</b></td><td>'+esc(o.b)+'</td><td>'+esc(o.p)+(o.s?' / '+esc(o.s):'')+'</td><td class="n">'+fmtN(o.qty)+'</td><td>'+esc(o.so)+'</td><td><span class="pill bad">'+esc(why)+'</span></td><td>'+(S.canWrite===false?'':'<button class="btn sm ok" data-close="'+esc(o.id)+'">'+doneLbl()+'</button>')+'</td></tr>').join('')+'</tbody></table></div></div>':'';
-  const q=norm($('#oq').value);const terms=q.split(/\s+/).filter(Boolean);
-  const list=visOrders().filter(o=>!terms.length||terms.every(t=>norm([o.orderNo,o.ch,o.kd,o.so,o.m,o.d,o.b,o.note].join(' ')).includes(t)));
+  fillOrdFilters();const q=norm($('#oq').value);const terms=q.split(/\s+/).filter(Boolean);
+  const list=visOrders().filter(ordFilter).filter(o=>!terms.length||terms.every(t=>norm([o.orderNo,o.ch,o.kd,o.so,o.m,o.d,o.b,o.note,o.createdBy].join(' ')).includes(t)));
   const groups=groupOrders(list);wantNames(groups.map(g=>g.o.createdBy));
   if(!groups.length){box.innerHTML='<div class="empty">'+(S.orders.length?'Không có đơn khớp bộ lọc.':'Chưa có đơn nào đang giữ hàng.')+'</div>';return}
   const ro=S.canWrite===false;
@@ -639,8 +641,9 @@ $('#cartOpen').onclick=openCart;
 $('#cartClear').onclick=async()=>{if(await confirmBox('Bỏ đơn đang soạn','Bỏ '+S.cart.length+' dòng chưa lưu?','Bỏ',true)){S.cart=[];renderCart();renderStock()}};
 $('#orderList').addEventListener('click',onOrdersClick);$('#reconcile').addEventListener('click',onOrdersClick);
 let oT=null;$('#oq').addEventListener('input',()=>{clearTimeout(oT);oT=setTimeout(renderOrders,150)});
+$('#oBy').onchange=renderOrders;$('#oKd').onchange=renderOrders;
 $('#bulkSo').onclick=openBulkSo;
-$('#copyOrders').onclick=()=>{const terms=norm($('#oq').value).split(/\s+/).filter(Boolean);const list=visOrders().filter(o=>!terms.length||terms.every(t=>norm([o.orderNo,o.ch,o.kd,o.so,o.m,o.d,o.b,o.note].join(' ')).includes(t)));
+$('#copyOrders').onclick=()=>{const terms=norm($('#oq').value).split(/\s+/).filter(Boolean);const list=visOrders().filter(ordFilter).filter(o=>!terms.length||terms.every(t=>norm([o.orderNo,o.ch,o.kd,o.so,o.m,o.d,o.b,o.note,o.createdBy].join(' ')).includes(t)));
   copyText(ordersTSV(groupOrders(list).flatMap(g=>g.ls)))};
 let hT=null;$('#hq').addEventListener('input',()=>{clearTimeout(hT);hT=setTimeout(renderHistory,150)});
 $('#hReload').onclick=loadHistory;
@@ -745,7 +748,7 @@ $('#impGo').onclick=impGo;
 /* ---------- xuất Excel báo cáo đơn chừa ---------- */
 async function exportReport(){const b=$('#exportRpt');const old=b.textContent;b.disabled=true;b.textContent='Đang tạo file…';
   try{await loadXlsx();await refreshState();const dm=await api('getDanhMuc');
-    S.dm={kv:dm.kv,kh:dm.kh,at:Date.now()};const L=buildL();
+    S.dm={kv:dm.kv,kh:dm.kh,at:Date.now()};S.dmIdx=null;const L=buildL(true);
     if(!L.length){toast('Không có đơn đang giữ để xuất',true);return}
     const units=Object.entries(L.reduce((a,x)=>(a[x.u]=(a[x.u]||0)+1,a),{})).sort((a,b)=>b[1]-a[1]).map(x=>x[0]);
     const now=new Date();const ts=pad(now.getDate())+'/'+pad(now.getMonth()+1)+'/'+now.getFullYear()+' '+pad(now.getHours())+':'+pad(now.getMinutes());
@@ -754,7 +757,7 @@ async function exportReport(){const b=$('#exportRpt');const old=b.textContent;b.
         g.don.add(x.so||x.no);g.ch.add(x.ch);g.ma.add(x.m);g.n++;g.u[x.u]=r3((g.u[x.u]||0)+x.q)}
       return [...m.values()].sort((a,b)=>{for(let i=0;i<a.v.length;i++){const c=cmp(a.v[i],b.v[i]);if(c)return c}return 0}).map(g=>[...g.v,g.don.size,...(extra.includes('ch')?[g.ch.size]:[]),g.ma.size,g.n,...units.map(u=>g.u[u]||'')])};
     const uh=units.map(u=>'SL ('+(u||'—')+')');
-    const tbl=(title,hdr,rows)=>{const tot=['TỔNG',...hdr.slice(1).map(()=>'')];const ws=XLSX.utils.aoa_to_sheet([[title],['Xuất lúc '+ts+' · chỉ tính hàng đang giữ trong app'],[],hdr,...rows]);
+    const tbl=(title,hdr,rows)=>{const tot=['TỔNG',...hdr.slice(1).map(()=>'')];const ws=XLSX.utils.aoa_to_sheet([[title],['Xuất lúc '+ts+' · chỉ tính hàng đang giữ trong app'+ordFilterTxt()],[],hdr,...rows]);
       ws['!autofilter']={ref:XLSX.utils.encode_range({s:{r:3,c:0},e:{r:3+rows.length,c:hdr.length-1}})};ws['!cols']=hdr.map((h,i)=>({wch:Math.min(48,Math.max(String(h).length+2,...rows.slice(0,400).map(r=>String(r[i]==null?'':r[i]).length+1)))}));return ws};
     const wb=XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb,tbl('ĐƠN CHỪA THEO KHU VỰC',['Khu vực (KV)','Số đơn','Số cửa hàng','Số mã hàng','Số dòng',...uh],agg(['kv'],['ch'])),'Theo KV');
@@ -778,9 +781,15 @@ function dmIdx(){if(S.dmIdx&&S.dmIdx.at===S.dm.at)return S.dmIdx;const kvOf={},b
   S.dmIdx={at:S.dm.at,kvOf,byCode,byName};return S.dmIdx}
 function resolveO(o){if(!S.dm)return {kv:'',sg:o.sg||'',kd:o.kd||'',kh:o.kh||''};const X=dmIdx();const c=(o.kh&&X.byCode[o.kh])||X.byName[nmK(o.ch)]||{};const sg=o.sg||c.sg||'';
   return {kv:(sg&&X.kvOf[sg])||(sg?'Nhóm BH '+sg:'Chưa phân KV'),sg,kd:o.kd||c.kd||'Chưa phân KD',kh:o.kh||c.code||''}}
+function ordFilter(o){const by=$('#oBy').value,kd=$('#oKd').value;return (!by||o.createdBy===by)&&(!kd||resolveO(o).kd===kd)}
+function ordFilterTxt(){const by=$('#oBy').value,kd=$('#oKd').value;return (by?' · Người giữ: '+by:'')+(kd?' · KD: '+kd:'')}
+function fillOrdFilters(){if(S.sess&&!S.dm&&!S.dmLoading){S.dmLoading=1;getDM().then(()=>{S.dmLoading=0;renderOrders()}).catch(()=>{S.dmLoading=0})}
+  const fill=(sel,vals,all)=>{const cur=sel.value;const v=[...new Set(vals.filter(Boolean))].sort((a,b)=>a.localeCompare(b,'vi'));
+    const html='<option value="">'+all+'</option>'+v.map(x=>'<option'+(x===cur?' selected':'')+'>'+esc(x)+'</option>').join('');if(sel._h!==html){sel.innerHTML=html;sel._h=html;if(cur&&!v.includes(cur))sel.value=''}};
+  const L=visOrders();fill($('#oBy'),L.map(o=>o.createdBy),'Tất cả người giữ');fill($('#oKd'),S.dm?L.map(o=>resolveO(o).kd):[],S.dm?'Tất cả KD':'KD (đang tải…)');}
 function isMine(o){const me=S.sess&&S.sess.kd;if(!me)return false;return nmK(resolveO(o).kd)===nmK(me)}
 function visOrders(){return S.sess&&S.sess.role==='kd'?S.orders.filter(isMine):S.orders}
-function buildL(){return visOrders().map(o=>{const r=resolveO(o);
+function buildL(f){return visOrders().filter(o=>!f||ordFilter(o)).map(o=>{const r=resolveO(o);
   return {kv:r.kv,sg:r.sg,kd:r.kd,by:o.createdBy||'',kh:r.kh,ch:o.ch||'',so:o.so||'',no:o.orderNo,m:o.m,d:o.d,p:o.p,n:o.n||'',s:o.s,x:o.x,b:o.b,u:o.u||'',q:+o.qty||0,note:o.note||''}})}
 
 /* ---------- đổi mật khẩu ---------- */
@@ -839,7 +848,7 @@ $('#vaGo').onclick=async()=>{const xs=VA.plan.filter(x=>x.act==='xong').map(x=>x
 
 /* ---------- tin nhắn Zalo theo KD ---------- */
 $('#zaloRpt').onclick=async()=>{try{await getDM()}catch(e){toast('Lỗi: '+errMsg(e),true);return}
-  const L=buildL();if(!L.length){toast('Không có đơn đang giữ',true);return}
+  const L=buildL(true);if(!L.length){toast('Không có đơn đang giữ',true);return}
   const kvs=[...new Set(L.map(x=>x.kv))].sort();const now=new Date();const ds=pad(now.getDate())+'/'+pad(now.getMonth()+1)+'/'+now.getFullYear();
   const ov=openModal('<div class="dh">Tin nhắn Zalo theo KD</div><div class="db"><div class="row" style="margin-bottom:8px"><label class="fld" style="margin:0"><span>Khu vực</span><select id="zKv">'+kvs.map(k=>'<option>'+esc(k)+'</option>').join('')+'</select></label><span class="small muted">Không ghi số ngày chừa. Tag KD thủ công khi dán vào Zalo.</span></div><div id="zBox"></div></div><div class="df"><button class="btn" data-x>Đóng</button><button class="btn pri" id="zAll">Sao chép tất cả</button></div>',true);
   ov.querySelector('[data-x]').onclick=()=>ov.remove();
