@@ -157,6 +157,7 @@ table.sap td.av{font-weight:700}
         <button class="btn" id="copyOrders">Sao chép danh sách</button>
         <button class="btn ok" id="exportRpt">Xuất Excel báo cáo</button>
         <button class="btn bad" id="bulkCancel">Hủy tất cả đơn đang lọc</button>
+        <button class="btn bad" id="maCancel" style="display:none">Hủy theo mã hàng (admin)</button>
         <button class="btn" id="zaloRpt">Tin nhắn Zalo theo KD</button>
       </div>
     </div>
@@ -529,6 +530,7 @@ function groupOrders(list){const g=new Map();for(const o of list){if(!g.has(o.or
   return [...g.entries()].map(([no,ls])=>({no,ls:ls.sort((a,b)=>(a.line||0)-(b.line||0)),o:ls[0]})).sort((a,b)=>String(b.o.createdAt).localeCompare(String(a.o.createdAt)))}
 function issues(){const out=[];for(const o of S.orders){const k=kOf(o);if(!S.stockByKey.has(k))out.push({o,why:'Lô không còn trong tồn SAP'});else if(availOf(k)<-0.0005)out.push({o,why:'Khả dụng âm '+fmtN(availOf(k))})}return out}
 function renderOrders(){
+  {const mc=$('#maCancel');if(mc)mc.style.display=S.sess&&S.sess.role==='admin'?'':'none'}
   const box=$('#orderList');
   if(!S.ordersLoaded){box.innerHTML='<div class="empty">Đang tải đơn…</div>';$('#reconcile').innerHTML='';return}
   // reconcile
@@ -653,6 +655,29 @@ $('#bulkCancel').onclick=async()=>{if(!S.canWrite){toast('Tài khoản không c�
   const reason=window._bcR||'';window._bcR='';const b=$('#bulkCancel');b.disabled=true;b.textContent='Đang hủy…';
   try{const ids=list.map(o=>o.id);let n=0;for(let i=0;i<ids.length;i+=1500)n+=await api('bulkCancel',ids.slice(i,i+1500),reason);await refreshState();toast('Đã hủy '+n+' dòng')}
   catch(e){toast('Lỗi: '+errMsg(e),true)}finally{b.disabled=false;b.textContent='Hủy tất cả đơn đang lọc'}};
+const normMa=v=>{const t=String(v==null?'':v).trim().toUpperCase();return /^\d+$/.test(t)?t.replace(/^0+/,''):t};
+function openMaCancel(){
+  if(!S.sess||S.sess.role!=='admin'){toast('Chỉ admin mới dùng được chức năng này',true);return}
+  const ov=openModal('<div class="dh">Hủy đơn giữ theo mã hàng <span class="small muted">(admin)</span></div><div class="db"><div class="small muted" style="margin-bottom:6px">Dán mã hàng (mỗi mã một dòng, hoặc cách nhau bằng dấu phẩy / khoảng trắng). App hủy <b>mọi dòng đang giữ</b> của các mã này, của tất cả người giữ.</div><textarea id="mcTxt" autofocus></textarea><div class="row" style="margin-top:8px"><label class="fld grow"><span>Kho</span><select id="mcP"><option value="">Tất cả kho</option></select></label><label class="fld grow"><span>Lý do (ghi vào ghi chú)</span><input type="text" id="mcR" placeholder="Ví dụ: mã ngưng kinh doanh / thu hồi hàng"></label></div><div id="mcRes" style="margin-top:10px"></div></div><div class="df"><button class="btn" data-x>Đóng</button><button class="btn bad" data-go disabled>Hủy các dòng khớp</button></div>',true);
+  let match=[],mats=[];const sel=ov.querySelector('#mcP');
+  const chk=()=>{mats=[...new Set(ov.querySelector('#mcTxt').value.split(/[\s,;]+/).map(normMa).filter(Boolean))];const ms=new Set(mats);
+    const all=S.orders.filter(o=>ms.has(normMa(o.m)));const ps=[...new Set(all.map(o=>o.p))].sort();const cur=sel.value;
+    sel.innerHTML='<option value="">Tất cả kho</option>'+ps.map(p=>'<option'+(p===cur?' selected':'')+'>'+esc(p)+'</option>').join('');
+    match=all.filter(o=>!sel.value||o.p===sel.value);const found=new Set(all.map(o=>normMa(o.m)));const miss=mats.filter(m=>!found.has(m));
+    const g=new Map();match.forEach(o=>{const k=o.m+'|'+o.p;let x=g.get(k);if(!x){x={m:o.m,d:o.d,p:o.p,n:0,q:0,u:o.u,by:new Set()};g.set(k,x)}x.n++;x.q+=+o.qty||0;x.by.add(o.createdBy||'—')});
+    ov.querySelector('#mcRes').innerHTML=!mats.length?'':'<div class="banner '+(match.length?'bad':'info')+'">Khớp <b>'+match.length+'</b> dòng đang giữ ('+new Set(match.map(o=>o.orderNo)).size+' đơn, '+new Set(match.map(o=>o.createdBy)).size+' người giữ).'+(miss.length?'<br>Không có đơn giữ: '+miss.slice(0,40).map(esc).join(', ')+(miss.length>40?'…':''):'')+'</div>'+
+      (match.length?'<div class="tw" style="max-height:240px"><table><thead><tr><th>Mã</th><th>Tên hàng</th><th>Kho</th><th class="n">Số dòng</th><th class="n">SL giữ</th><th>Người giữ</th></tr></thead><tbody>'+[...g.values()].map(x=>'<tr><td>'+esc(x.m)+'</td><td class="desc">'+esc(x.d)+'</td><td>'+esc(x.p)+'</td><td class="n">'+x.n+'</td><td class="n">'+fmtN(x.q)+' '+esc(x.u||'')+'</td><td class="small">'+[...x.by].map(esc).join(', ')+'</td></tr>').join('')+'</tbody></table></div>':'');
+    ov.querySelector('[data-go]').disabled=!match.length};
+  ov.querySelector('#mcTxt').addEventListener('input',()=>{clearTimeout(ov._t);ov._t=setTimeout(chk,300)});sel.onchange=chk;
+  ov.querySelector('[data-x]').onclick=()=>ov.remove();
+  ov.querySelector('[data-go]').onclick=async()=>{const reason=ov.querySelector('#mcR').value.trim();const plant=sel.value;const cnt=match.length;
+    ov.style.display='none';
+    if(!await confirmBox('Xác nhận hủy theo mã','Hủy <b>'+cnt+'</b> dòng đang giữ của <b>'+new Set(match.map(o=>normMa(o.m))).size+'</b> mã'+(plant?' tại kho <b>'+esc(plant)+'</b>':' ở <b>tất cả kho</b>')+'? Hàng trả về khả dụng ngay.','Hủy '+cnt+' dòng',true)){ov.style.display='';return}
+    const b=ov.querySelector('[data-go]');b.disabled=true;b.textContent='Đang hủy…';
+    try{const n=await api('huyTheoMa',mats,plant?[plant]:[],reason);ov.remove();await refreshState();toast('Đã hủy '+n+' dòng theo mã hàng')}
+    catch(e){ov.style.display='';b.disabled=false;b.textContent='Hủy các dòng khớp';toast('Lỗi: '+errMsg(e),true)}};
+}
+$('#maCancel').onclick=openMaCancel;
 $('#bulkSo').onclick=openBulkSo;
 $('#copyOrders').onclick=()=>{const terms=norm($('#oq').value).split(/\s+/).filter(Boolean);const list=visOrders().filter(ordFilter).filter(o=>!terms.length||terms.every(t=>norm([o.orderNo,o.ch,o.kd,o.so,o.m,o.d,o.b,o.note,o.createdBy].join(' ')).includes(t)));
   copyText(ordersTSV(groupOrders(list).flatMap(g=>g.ls)))};
