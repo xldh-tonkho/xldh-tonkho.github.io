@@ -68,6 +68,8 @@ tbody tr.click{cursor:pointer}tbody tr.click:hover{background:#f3f7fe}
 .ord .hd .sp{flex:1}
 .ord input.selL,.ord input.selG,#selBar input{width:17px;height:17px;cursor:pointer;accent-color:var(--bad);margin:0}
 .ord tr.picked td{background:#fdecea}
+.ord tr.sub td{background:#f4f6fa;font-size:12px;color:#475467;padding-top:5px;padding-bottom:5px;border-top:1px solid var(--line)}
+.ord input.selP{width:15px;height:15px;cursor:pointer;accent-color:var(--bad)}
 #selBar .card{position:sticky;top:0;z-index:6;padding:8px 12px;margin-bottom:10px}
 .ord table td,.ord table th{border-bottom:1px solid #f0f2f5}
 .cartbar{position:fixed;left:50%;transform:translateX(-50%);bottom:16px;z-index:30;background:var(--ink);color:#fff;border-radius:12px;padding:10px 12px 10px 16px;display:flex;gap:12px;align-items:center;box-shadow:0 8px 24px rgba(16,24,40,.25)}
@@ -533,6 +535,9 @@ function handleWriteErr(){}
 /* ---------- orders tab ---------- */
 function groupOrders(list){const g=new Map();for(const o of list){if(!g.has(o.orderNo))g.set(o.orderNo,[]);g.get(o.orderNo).push(o)}
   return [...g.entries()].map(([no,ls])=>({no,ls:ls.sort((a,b)=>(a.line||0)-(b.line||0)),o:ls[0]})).sort((a,b)=>String(b.o.createdAt).localeCompare(String(a.o.createdAt)))}
+const chKey=s=>norm(String(s||'').split(String.fromCharCode(8203)).join('')).replace(/\s+/g,' ');
+function groupByCh(list){const m=new Map();for(const g of groupOrders(list)){const k=chKey(g.o.ch);if(!m.has(k))m.set(k,{key:k,ch:g.o.ch,ps:[],ls:[],t:''});const G=m.get(k);G.ps.push(g);G.ls.push(...g.ls);const t=String(g.o.createdAt);if(t>G.t)G.t=t}
+  return [...m.values()].sort((a,b)=>b.t.localeCompare(a.t))}
 function issues(){const out=[];for(const o of S.orders){const k=kOf(o);if(!S.stockByKey.has(k))out.push({o,why:'Lô không còn trong tồn SAP'});else if(availOf(k)<-0.0005)out.push({o,why:'Khả dụng âm '+fmtN(availOf(k))})}return out}
 function renderOrders(){
   {const mc=$('#maCancel');if(mc)mc.style.display=S.sess&&S.sess.role==='admin'?'':'none'}
@@ -548,14 +553,19 @@ function renderOrders(){
   {const live=new Set(S.orders.map(o=>o.id));for(const id of [...S.sel])if(!live.has(id))S.sel.delete(id)}S._olist=list.map(o=>o.id);
   if(!groups.length){box.innerHTML='<div class="empty">'+(S.orders.length?'Không có đơn khớp bộ lọc.':'Chưa có đơn nào đang giữ hàng.')+'</div>';updateSelUI();return}
   const ro=S.canWrite===false;
-  box.innerHTML=groups.map(g=>{const o=g.o;
-    return '<div class="ord"><div class="hd">'+(ro?'':'<input type="checkbox" class="selG" data-g="'+esc(g.no)+'" title="Chọn cả đơn">')+'<span class="t">'+esc(o.ch)+'</span>'+(o.kd?'<span class="pill info">KD '+esc(o.kd)+'</span>':'')+
-      (o.so?'<span class="pill ok">SAP '+esc(o.so)+'</span>':'<span class="pill warn">Chưa có số SAP</span>')+
-      '<span class="muted small">'+esc(g.no)+' · '+esc(fmtDT(o.createdAt))+' '+esc(nameOf(o.createdBy))+'</span>'+(o.note?'<span class="small">📝 '+esc(o.note)+'</span>':'')+'<span class="sp"></span>'+
-      (ro?'':'<button class="btn sm" data-so="'+esc(g.no)+'">'+(o.so?'Sửa số SAP':'Nhập số SAP')+'</button><button class="btn sm bad" data-cancelall="'+esc(g.no)+'">Hủy đơn</button><button class="btn sm ok" data-closeall="'+esc(g.no)+'">'+doneLbl()+' cả đơn</button>')+
+  const chs=groupByCh(list);
+  box.innerHTML=chs.map(G=>{const kds=[...new Set(G.ls.map(l=>l.kd).filter(Boolean))];const sos=[...new Set(G.ls.map(l=>l.so).filter(Boolean))];const tot={};G.ls.forEach(l=>tot[l.u]=r3((tot[l.u]||0)+(+l.qty||0)));
+    const nc=ro?9:10;
+    return '<div class="ord"><div class="hd">'+(ro?'':'<input type="checkbox" class="selG" data-g="'+esc(G.key)+'" title="Chọn cả cửa hàng">')+'<span class="t">'+esc(G.ch)+'</span>'+kds.map(k=>'<span class="pill info">KD '+esc(k)+'</span>').join('')+
+      '<span class="pill">'+G.ps.length+' phiếu · '+G.ls.length+' dòng · '+Object.entries(tot).map(([u,q])=>fmtN(q)+' '+esc(u)).join(' + ')+'</span>'+
+      (sos.length?sos.slice(0,4).map(s=>'<span class="pill ok">SAP '+esc(s)+'</span>').join('')+(sos.length>4?'<span class="small muted">+'+(sos.length-4)+'</span>':''):'<span class="pill warn">Chưa có số SAP</span>')+'<span class="sp"></span>'+
+      (ro?'':(G.ps.length>1?'<button class="btn sm bad" data-cancelch="'+esc(G.key)+'">Hủy cả CH</button><button class="btn sm ok" data-closech="'+esc(G.key)+'">'+doneLbl()+' cả CH</button>':'<button class="btn sm" data-so="'+esc(G.ps[0].no)+'">'+(G.ps[0].o.so?'Sửa số SAP':'Nhập số SAP')+'</button><button class="btn sm bad" data-cancelall="'+esc(G.ps[0].no)+'">Hủy đơn</button><button class="btn sm ok" data-closeall="'+esc(G.ps[0].no)+'">'+doneLbl()+' cả đơn</button>'))+
       '</div><div style="overflow:auto"><table><thead><tr>'+(ro?'':'<th style="width:26px"></th>')+'<th>Mã</th><th>Tên hàng</th><th>Kho</th><th>Lô</th><th class="n">SL giữ</th><th>ĐVT</th><th class="n">Khả dụng lô</th><th></th></tr></thead><tbody>'+
-      g.ls.map(l=>{const a=availOf(kOf(l));return '<tr'+(S.sel.has(l.id)?' class="picked"':'')+'>'+(ro?'':'<td><input type="checkbox" class="selL" data-id="'+esc(l.id)+'" data-g="'+esc(g.no)+'"'+(S.sel.has(l.id)?' checked':'')+'></td>')+'<td><b>'+esc(l.m)+'</b></td><td class="desc">'+esc(l.d)+'</td><td>'+esc(l.p)+(l.s?' / '+esc(l.s):'')+'</td><td>'+esc(l.b)+'</td><td class="n held">'+fmtN(l.qty)+'</td><td>'+esc(l.u)+'</td><td class="n av '+avCls(a)+'">'+fmtN(a)+'</td><td>'+
-        (ro?'':'<button class="btn sm" data-edit="'+esc(l.id)+'">Sửa SL</button> <button class="btn sm bad" data-cancel="'+esc(l.id)+'">Hủy</button> <button class="btn sm ok" data-close="'+esc(l.id)+'">'+doneLbl()+'</button>')+'</td></tr>'}).join('')+
+      G.ps.map(P=>{const o=P.o;
+        const sub='<tr class="sub"><td colspan="'+(nc-1)+'">'+(ro?'':'<input type="checkbox" class="selP" data-p="'+esc(P.no)+'" title="Chọn cả phiếu" style="margin-right:6px;vertical-align:-3px">')+'<b>'+esc(P.no)+'</b> · '+esc(fmtDT(o.createdAt))+' '+esc(nameOf(o.createdBy))+' · '+(o.so?'<span class="pill ok">SAP '+esc(o.so)+'</span>':'<span class="pill warn">Chưa có số SAP</span>')+(o.note?' · 📝 '+esc(o.note):'')+'</td>'+
+          '<td style="white-space:nowrap">'+(ro||G.ps.length<2?'':'<button class="btn sm" data-so="'+esc(P.no)+'">'+(o.so?'Sửa SAP':'Nhập SAP')+'</button> <button class="btn sm bad" data-cancelall="'+esc(P.no)+'">Hủy phiếu</button> <button class="btn sm ok" data-closeall="'+esc(P.no)+'">'+doneLbl()+' phiếu</button>')+'</td></tr>';
+        return sub+P.ls.map(l=>{const a=availOf(kOf(l));return '<tr'+(S.sel.has(l.id)?' class="picked"':'')+'>'+(ro?'':'<td><input type="checkbox" class="selL" data-id="'+esc(l.id)+'" data-g="'+esc(G.key)+'" data-p="'+esc(P.no)+'"'+(S.sel.has(l.id)?' checked':'')+'></td>')+'<td><b>'+esc(l.m)+'</b></td><td class="desc">'+esc(l.d)+'</td><td>'+esc(l.p)+(l.s?' / '+esc(l.s):'')+'</td><td>'+esc(l.b)+'</td><td class="n held">'+fmtN(l.qty)+'</td><td>'+esc(l.u)+'</td><td class="n av '+avCls(a)+'">'+fmtN(a)+'</td><td>'+
+          (ro?'':'<button class="btn sm" data-edit="'+esc(l.id)+'">Sửa SL</button> <button class="btn sm bad" data-cancel="'+esc(l.id)+'">Hủy</button> <button class="btn sm ok" data-close="'+esc(l.id)+'">'+doneLbl()+'</button>')+'</td></tr>'}).join('')}).join('')+
       '</tbody></table></div></div>'}).join('');
   updateSelUI();
 }
@@ -570,6 +580,8 @@ async function onOrdersClick(e){
   const byId=id=>S.orders.find(o=>o.id===id);
   if(d.close){const o=byId(d.close);if(o&&await confirmBox(doneLbl(),'<b>'+esc(o.m)+'</b> lô '+esc(o.b)+' · '+fmtN(o.qty)+' '+esc(o.u)+' của <b>'+esc(o.ch)+'</b> '+(useA0()?'đã tạo đơn trên SAP (SAP đã trừ khả dụng)?':'đã xuất kho trên SAP?'),doneLbl()))await setStatus([o.id],'xong')}
   else if(d.cancel){const o=byId(d.cancel);if(o&&await confirmBox('Hủy giữ hàng','Hủy dòng <b>'+esc(o.m)+'</b> · '+fmtN(o.qty)+' '+esc(o.u)+' của <b>'+esc(o.ch)+'</b>? Số lượng trả lại khả dụng.','Hủy dòng',true))await setStatus([o.id],'huy')}
+  else if(d.closech||d.cancelch){const key=d.closech||d.cancelch;const vis=new Set(S._olist||[]);const ls=S.orders.filter(o=>vis.has(o.id)&&chKey(o.ch)===key);const st=d.closech?'xong':'huy';if(!ls.length)return;
+    if(await confirmBox(st==='xong'?doneLbl()+' cả cửa hàng':'Hủy cả cửa hàng',(st==='xong'?doneLbl()+': ':'Hủy ')+ls.length+' dòng ('+new Set(ls.map(o=>o.orderNo)).size+' phiếu) của <b>'+esc(ls[0].ch)+'</b> đang hiển thị?',st==='xong'?doneLbl():'Hủy hết',st==='huy'))await setStatus(ls.map(o=>o.id),st)}
   else if(d.closeall||d.cancelall){const no=d.closeall||d.cancelall;const ls=S.orders.filter(o=>o.orderNo===no);const st=d.closeall?'xong':'huy';
     if(await confirmBox(st==='xong'?doneLbl()+' cả đơn':'Hủy cả đơn',(st==='xong'?doneLbl()+': ':'Hủy ')+ls.length+' dòng của <b>'+esc(ls[0]&&ls[0].ch)+'</b> ('+esc(no)+')?',st==='xong'?doneLbl():'Hủy đơn',st==='huy'))await setStatus(ls.map(o=>o.id),st)}
   else if(d.edit){const o=byId(d.edit);if(!o)return;const v=await inputBox('Sửa số lượng giữ',o.m+' lô '+(o.b||'—')+' ('+o.u+')',o.qty,'number');if(v==null)return;const n=r3(+v);
@@ -689,6 +701,7 @@ $('#maCancel').onclick=openMaCancel;
 function updateSelUI(){const box=$('#orderList'),bar=$('#selBar');if(!box||!bar)return;const ro=S.canWrite===false;
   box.querySelectorAll('input.selL').forEach(c=>{const on=S.sel.has(c.dataset.id);c.checked=on;const tr=c.closest('tr');if(tr)tr.classList.toggle('picked',on)});
   box.querySelectorAll('input.selG').forEach(c=>{const ls=[...box.querySelectorAll('input.selL')].filter(x=>x.dataset.g===c.dataset.g);const n=ls.filter(x=>x.checked).length;c.checked=!!n&&n===ls.length;c.indeterminate=n>0&&n<ls.length});
+  box.querySelectorAll('input.selP').forEach(c=>{const ls=[...box.querySelectorAll('input.selL')].filter(x=>x.dataset.p===c.dataset.p);const n=ls.filter(x=>x.checked).length;c.checked=!!n&&n===ls.length;c.indeterminate=n>0&&n<ls.length});
   const vis=S._olist||[];if(ro||!vis.length){bar.innerHTML=S.sel.size&&!ro?'<div class="card"><div class="row"><b>Đã chọn '+S.sel.size+' dòng</b> (không nằm trong bộ lọc hiện tại)<span style="flex:1"></span><button class="btn sm" id="selClr">Bỏ chọn</button><button class="btn sm bad" id="selDel">Hủy '+S.sel.size+' dòng đã chọn</button></div></div>':'';return}
   const nv=vis.filter(id=>S.sel.has(id)).length;const hid=S.sel.size-nv;const nDon=new Set(S.orders.filter(o=>S.sel.has(o.id)).map(o=>o.orderNo)).size;
   bar.innerHTML='<div class="card"><div class="row"><label style="display:flex;gap:8px;align-items:center;cursor:pointer;font-weight:600"><input type="checkbox" id="selAll"> Chọn tất cả '+vis.length+' dòng đang lọc</label><span style="flex:1"></span>'+
@@ -699,6 +712,7 @@ $('#orderList').addEventListener('click',e=>{const c=e.target;if(!(c instanceof 
   if(c.classList.contains('selL')){const all=[...$('#orderList').querySelectorAll('input.selL')];const i=all.indexOf(c);
     if(e.shiftKey&&_lastSel!=null&&_lastSel<all.length){const[a,b]=[Math.min(i,_lastSel),Math.max(i,_lastSel)];for(let k=a;k<=b;k++)c.checked?S.sel.add(all[k].dataset.id):S.sel.delete(all[k].dataset.id)}
     else c.checked?S.sel.add(c.dataset.id):S.sel.delete(c.dataset.id);_lastSel=i;updateSelUI()}
+  else if(c.classList.contains('selP')){const on=c.checked;$('#orderList').querySelectorAll('input.selL').forEach(x=>{if(x.dataset.p===c.dataset.p)on?S.sel.add(x.dataset.id):S.sel.delete(x.dataset.id)});updateSelUI()}
   else if(c.classList.contains('selG')){const on=c.checked;$('#orderList').querySelectorAll('input.selL').forEach(x=>{if(x.dataset.g===c.dataset.g)on?S.sel.add(x.dataset.id):S.sel.delete(x.dataset.id)});updateSelUI()}});
 $('#selBar').addEventListener('click',async e=>{const t=e.target;
   if(t.id==='selAll'){(S._olist||[]).forEach(id=>t.checked?S.sel.add(id):S.sel.delete(id));updateSelUI()}
