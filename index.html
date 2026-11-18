@@ -961,9 +961,9 @@ function drawReport(data,area,ds,title,cols){
   const fB='bold 14px '+F,fI='13px '+F,fN='italic 12px '+F,inW=W-28;
   const lay=data.map(k=>{let h=58+10;const body=k.cs.map(c=>{const nm=wrap([c.name],inW,fB,' ');const it=wrap(c.it,inW-12,fI,'  ·  ');const nt=c.notes.length?wrap(['Ghi chú: '+c.notes.join('; ')],inW-12,fN,' '):[];const hh=nm.length*19+it.length*18+nt.length*17+8;h+=hh;return {nm,it,nt}});h+=10+40+12;return {k,body,h}});
   const nc=Math.max(1,Math.min(cols||3,lay.length));const colH=Array(nc).fill(0);const pos=lay.map(c=>{const i=colH.indexOf(Math.min(...colH));const y=colH[i];colH[i]+=c.h+G;return {c,x:PAD+i*(W+G),y}});
-  const TH=58,totW=PAD*2+nc*W+(nc-1)*G,totH=TH+Math.max(...colH)-G+PAD;cv.width=totW*SC;cv.height=totH*SC;ctx.scale(SC,SC);
+  const totW=PAD*2+nc*W+(nc-1)*G;const tl=wrap([title],totW-PAD*2,'bold 22px '+F,' ');const TH=30+tl.length*28,totH=TH+Math.max(...colH)-G+PAD;cv.width=totW*SC;cv.height=totH*SC;ctx.scale(SC,SC);
   ctx.fillStyle='#eef1f6';ctx.fillRect(0,0,totW,totH);ctx.fillStyle='#173a7a';ctx.textBaseline='alphabetic';
-  const tl=wrap([title],totW-PAD*2,'bold 22px '+F,' ');ctx.font='bold 22px '+F;ctx.fillText(tl[0],PAD,36);
+  ctx.font='bold 22px '+F;tl.forEach((l,i)=>ctx.fillText(l,PAD,36+i*28));
   const rr=(x,y,w,h,r,tl,tr,br,bl)=>{ctx.beginPath();ctx.moveTo(x+(tl?r:0),y);ctx.lineTo(x+w-(tr?r:0),y);tr?ctx.arcTo(x+w,y,x+w,y+r,r):0;ctx.lineTo(x+w,y+h-(br?r:0));br?ctx.arcTo(x+w,y+h,x+w-r,y+h,r):0;ctx.lineTo(x+(bl?r:0),y+h);bl?ctx.arcTo(x,y+h,x,y+h-r,r):0;ctx.lineTo(x,y+(tl?r:0));tl?ctx.arcTo(x,y,x+r,y,r):0;ctx.closePath()};
   pos.forEach(({c,x,y})=>{y+=TH;const k=c.k;ctx.save();ctx.shadowColor='rgba(16,24,40,.12)';ctx.shadowBlur=8;ctx.shadowOffsetY=2;ctx.fillStyle='#fff';rr(x,y,W,c.h,8,1,1,1,1);ctx.fill();ctx.restore();
     ctx.fillStyle='#1d4f9c';rr(x,y,W,58,8,1,1,0,0);ctx.fill();
@@ -980,27 +980,35 @@ async function copyCv(cv){try{const b=await cvBlob(cv);await navigator.clipboard
 function dlCv(cv,fn){const a=document.createElement('a');a.download=fn;a.href=cv.toDataURL('image/png');document.body.appendChild(a);a.click();a.remove()}
 $('#imgRpt').onclick=async()=>{try{await getDM()}catch(e){}
   const terms=norm($('#oq').value).split(/\s+/).filter(Boolean);
-  const os=visOrders().filter(ordFilter).filter(o=>!terms.length||terms.every(t=>norm([o.orderNo,o.ch,o.kd,o.so,o.m,o.d,o.b,o.note,o.createdBy].join(' ')).includes(t)));
-  if(!os.length){toast('Không có đơn nào đang lọc',true);return}
-  const L=os.map(o=>{const r=resolveO(o);return {kv:r.kv||'',kd:r.kd||o.kd||'',ch:o.ch||'',m:o.m,d:o.d,x:o.x||'',b:o.b||'',u:o.u||'',q:+o.qty||0,note:o.note||''}});
-  const kvs=[...new Set(L.map(x=>x.kv||'(chưa rõ khu vực)'))].sort();const now=new Date();const ds=pad(now.getDate())+'/'+pad(now.getMonth()+1)+'/'+now.getFullYear();
-  const ov=openModal('<div class="dh">Xuất hình báo cáo đơn tồn động</div><div class="db"><div class="small muted" style="margin-bottom:8px">Lấy theo bộ lọc đang chọn ('+os.length+' dòng). Muốn ra hình riêng thì lọc trước theo người giữ / KD / tìm kiếm.</div>'+
+  const osF=visOrders().filter(ordFilter).filter(o=>!terms.length||terms.every(t=>norm([o.orderNo,o.ch,o.kd,o.so,o.m,o.d,o.b,o.note,o.createdBy].join(' ')).includes(t)));
+  const osS=S.orders.filter(o=>S.sel.has(o.id));let useSel=osS.length>0;
+  if(!osF.length&&!osS.length){toast('Không có đơn nào đang lọc',true);return}
+  const toL=os=>os.map(o=>{const r=resolveO(o);return {kv:r.kv||'',kd:r.kd||o.kd||'',ch:o.ch||'',m:o.m,d:o.d,x:o.x||'',b:o.b||'',u:o.u||'',q:+o.qty||0,note:o.note||''}});
+  let L=toL(useSel?osS:osF);const os=useSel?osS:osF;
+  const kvs=[...new Set(toL(osS.concat(osF)).map(x=>x.kv||'(chưa rõ khu vực)'))].sort();const now=new Date();const ds=pad(now.getDate())+'/'+pad(now.getMonth()+1)+'/'+now.getFullYear();
+  const ov=openModal('<div class="dh">Xuất hình báo cáo đơn tồn động</div><div class="db">'+(osS.length?'<label class="banner info" style="display:flex;gap:8px;align-items:center;margin-bottom:8px;cursor:pointer"><input type="checkbox" id="irSel" checked> Chỉ báo cáo <b>'+osS.length+' dòng đã tích chọn</b> (bỏ tích để lấy '+osF.length+' dòng theo bộ lọc)</label>':'<div class="small muted" style="margin-bottom:8px">Lấy theo bộ lọc đang chọn ('+os.length+' dòng). Muốn chỉ báo cáo vài mã thì tích chọn các dòng đó trước rồi bấm Xuất hình.</div>')+
     '<div class="row" style="margin-bottom:8px"><label class="fld" style="margin:0"><span>Khu vực</span><select id="irKv">'+(kvs.length>1?'<option value="*">Tất cả khu vực</option>':'')+kvs.map(k=>'<option>'+esc(k)+'</option>').join('')+'</select></label>'+
     '<label class="fld grow" style="margin:0"><span>Tên khu vực in trên hình</span><input type="text" id="irArea"></label><label class="fld" style="margin:0"><span>Số cột</span><select id="irCols"><option>1</option><option>2</option><option selected>3</option><option>4</option></select></label></div>'+
-    '<div id="irBox" style="max-height:60vh;overflow:auto;background:#eef1f6;border-radius:8px;padding:8px;text-align:center"></div><div id="irKds" style="margin-top:8px"></div></div>'+
+    '<div id="irKdSel" style="margin-bottom:8px"></div><div id="irBox" style="max-height:60vh;overflow:auto;background:#eef1f6;border-radius:8px;padding:8px;text-align:center"></div><div id="irKds" style="margin-top:8px"></div></div>'+
     '<div class="df"><button class="btn" data-x>Đóng</button><button class="btn" id="irDl">Tải PNG</button><button class="btn pri" id="irCp">Sao chép hình</button></div>',true);
   ov.querySelector('[data-x]').onclick=()=>ov.remove();const kvSel=ov.querySelector('#irKv'),ar=ov.querySelector('#irArea');
   const setArea=()=>{const v=kvSel.value;ar.value=v==='*'||v==='(chưa rõ khu vực)'?(localStorage.getItem('irArea')||'KV27 Cần Thơ'):v};setArea();
-  let cv=null,cards=[];
-  const draw=()=>{const v=kvSel.value;const LL=L.filter(x=>v==='*'||(x.kv||'(chưa rõ khu vực)')===v);const area=ar.value.trim()||'Khu vực';const data=imgData(LL);
+  let cv=null,cards=[];const kdOff=new Set();const kdN=x=>x.kd||'Chưa có KD';
+  const chips=()=>{const v=kvSel.value;const m=new Map();L.filter(x=>v==='*'||(x.kv||'(chưa rõ khu vực)')===v).forEach(x=>m.set(kdN(x),(m.get(kdN(x))||0)+1));const ks=[...m.keys()].sort((a,b)=>a.localeCompare(b,'vi'));
+    ov.querySelector('#irKdSel').innerHTML='<div class="row" style="gap:6px;align-items:center"><b class="small">KD báo cáo:</b><button class="btn sm" data-ka="1">Chọn tất cả</button><button class="btn sm" data-ka="0">Bỏ hết</button>'+
+      ks.map(k=>'<label class="pill'+(kdOff.has(k)?'':' info')+'" style="cursor:pointer;display:inline-flex;gap:4px;align-items:center"><input type="checkbox" data-kk="'+esc(k)+'"'+(kdOff.has(k)?'':' checked')+'>'+esc(k)+' ('+m.get(k)+')</label>').join('')+'</div>';
+    ov.querySelectorAll('[data-kk]').forEach(c=>c.onchange=()=>{c.checked?kdOff.delete(c.dataset.kk):kdOff.add(c.dataset.kk);chips();draw()});
+    ov.querySelectorAll('[data-ka]').forEach(b=>b.onclick=()=>{ks.forEach(k=>b.dataset.ka==='1'?kdOff.delete(k):kdOff.add(k));chips();draw()})};
+  const draw=()=>{const v=kvSel.value;const LL=L.filter(x=>(v==='*'||(x.kv||'(chưa rõ khu vực)')===v)&&!kdOff.has(kdN(x)));
+    if(!LL.length){cv=document.createElement('canvas');ov.querySelector('#irBox').innerHTML='<div class="empty">Chưa chọn KD nào.</div>';ov.querySelector('#irKds').innerHTML='';return}const area=ar.value.trim()||'Khu vực';const data=imgData(LL);
     const title='ĐƠN HÀNG ĐANG TỒN ĐỘNG – '+area.toUpperCase()+' · KD nhắc khách lấy hàng nha';
     cv=drawReport(data,area,ds,title,+ov.querySelector('#irCols').value);cv.style.maxWidth='100%';cv.style.height='auto';const box=ov.querySelector('#irBox');box.innerHTML='';box.appendChild(cv);
     cards=data.map(k=>({kd:k.kd,cv:drawReport([k],area,ds,'ĐƠN TỒN ĐỘNG – '+area.toUpperCase()+' · KD '+k.kd,1)}));
     ov.querySelector('#irKds').innerHTML=data.length>1?'<div class="small muted" style="margin-bottom:4px">Hình riêng từng KD (để gửi riêng):</div><div class="row">'+cards.map((c,i)=>'<span class="pill info" style="gap:6px;display:inline-flex;align-items:center">'+esc(c.kd)+' <button class="btn sm" data-kc="'+i+'">Sao chép</button><button class="btn sm" data-kd="'+i+'">Tải</button></span>').join('')+'</div>':'';
     ov.querySelectorAll('[data-kc]').forEach(b=>b.onclick=()=>copyCv(cards[+b.dataset.kc].cv));
     ov.querySelectorAll('[data-kd]').forEach(b=>b.onclick=()=>dlCv(cards[+b.dataset.kd].cv,'DonTonDong_KD_'+cards[+b.dataset.kd].kd.replace(/\s+/g,'_')+'_'+ds.replace(/\//g,'-')+'.png'))};
-  kvSel.onchange=()=>{setArea();draw()};ov.querySelector('#irCols').onchange=draw;let t=null;ar.oninput=()=>{try{localStorage.setItem('irArea',ar.value)}catch(e){}clearTimeout(t);t=setTimeout(draw,300)};
-  ov.querySelector('#irDl').onclick=()=>dlCv(cv,'DonTonDong_'+ar.value.trim().replace(/\s+/g,'_')+'_'+ds.replace(/\//g,'-')+'.png');ov.querySelector('#irCp').onclick=()=>copyCv(cv);draw()};
+  kvSel.onchange=()=>{setArea();chips();draw()};ov.querySelector('#irCols').onchange=draw;{const cs=ov.querySelector('#irSel');if(cs)cs.onchange=()=>{useSel=cs.checked;L=toL(useSel?osS:osF);chips();draw()}}let t=null;ar.oninput=()=>{try{localStorage.setItem('irArea',ar.value)}catch(e){}clearTimeout(t);t=setTimeout(draw,300)};
+  ov.querySelector('#irDl').onclick=()=>dlCv(cv,'DonTonDong_'+ar.value.trim().replace(/\s+/g,'_')+'_'+ds.replace(/\//g,'-')+'.png');ov.querySelector('#irCp').onclick=()=>copyCv(cv);chips();draw()};
 function copyTxt(t){(navigator.clipboard?navigator.clipboard.writeText(t):Promise.reject()).then(()=>toast('Đã sao chép – dán vào Zalo')).catch(()=>showTextDialog('Sao chép tin nhắn',t))}
 
 /* ---------- tổng quan ---------- */
