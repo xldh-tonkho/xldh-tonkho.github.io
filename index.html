@@ -951,9 +951,9 @@ function shortCh(s){s=String(s||'').split(String.fromCharCode(8203)).join('').tr
 const shortMa=(d,m)=>{const c=String(d||'').split(',')[1];return c?c.trim().split('-')[0]:(m||'')};
 const unitLbl=u=>({TH:'th',VIE:'v',PAC:'gói',BAO:'bao',CAI:'cái',M2:'m2'})[String(u).toUpperCase()]||String(u||'').toLowerCase();
 function imgData(L){const by=new Map();L.forEach(x=>{const kd=x.kd||'Chưa có KD';if(!by.has(kd))by.set(kd,new Map());const cm=by.get(kd);const c=shortCh(x.ch);if(!cm.has(c))cm.set(c,{name:c,it:new Map(),notes:new Set()});const g=cm.get(c);
-    const k=shortMa(x.d,x.m)+'|'+x.u;g.it.set(k,(g.it.get(k)||0)+x.q);if(x.note)g.notes.add(x.note)});
+    const k=shortMa(x.d,x.m)+'|'+x.u+'|'+(x.x||x.b||'');g.it.set(k,(g.it.get(k)||0)+x.q);if(x.note)g.notes.add(x.note)});
   return [...by.entries()].sort((a,b)=>a[0].localeCompare(b[0],'vi')).map(([kd,cm])=>{const cs=[...cm.values()].sort((a,b)=>a.name.localeCompare(b.name,'vi'));
-    return {kd,cs:cs.map(c=>({name:c.name,notes:[...c.notes],it:[...c.it.entries()].map(([k,q])=>{const[m,u]=k.split('|');return m+': '+fmtN(q)+' '+unitLbl(u)})})),nKh:cs.length,nMa:cs.reduce((a,c)=>a+c.it.size,0)}})}
+    return {kd,cs:cs.map(c=>({name:c.name,notes:[...c.notes],it:[...c.it.entries()].sort((a,b)=>a[0].localeCompare(b[0])).map(([k,q])=>{const[m,u,lo]=k.split('|');return m+(lo?' lô'+lo:'')+': '+fmtN(q)+' '+unitLbl(u)})})),nKh:cs.length,nMa:cs.reduce((a,c)=>a+new Set([...c.it.keys()].map(k=>k.split('|')[0])).size,0)}})}
 function drawReport(data,area,ds,title,cols){
   const SC=2,W=340,G=16,PAD=20,F='"Segoe UI",Roboto,Arial,sans-serif';const cv=document.createElement('canvas');const ctx=cv.getContext('2d');
   const wrap=(parts,maxW,font,sep)=>{ctx.font=font;const out=[];let cur='';parts.forEach(p=>{const t=cur?cur+sep+p:p;if(ctx.measureText(t).width<=maxW||!cur)cur=t;else{out.push(cur);cur=p}});if(cur)out.push(cur);
@@ -982,7 +982,7 @@ $('#imgRpt').onclick=async()=>{try{await getDM()}catch(e){}
   const terms=norm($('#oq').value).split(/\s+/).filter(Boolean);
   const os=visOrders().filter(ordFilter).filter(o=>!terms.length||terms.every(t=>norm([o.orderNo,o.ch,o.kd,o.so,o.m,o.d,o.b,o.note,o.createdBy].join(' ')).includes(t)));
   if(!os.length){toast('Không có đơn nào đang lọc',true);return}
-  const L=os.map(o=>{const r=resolveO(o);return {kv:r.kv||'',kd:r.kd||o.kd||'',ch:o.ch||'',m:o.m,d:o.d,u:o.u||'',q:+o.qty||0,note:o.note||''}});
+  const L=os.map(o=>{const r=resolveO(o);return {kv:r.kv||'',kd:r.kd||o.kd||'',ch:o.ch||'',m:o.m,d:o.d,x:o.x||'',b:o.b||'',u:o.u||'',q:+o.qty||0,note:o.note||''}});
   const kvs=[...new Set(L.map(x=>x.kv||'(chưa rõ khu vực)'))].sort();const now=new Date();const ds=pad(now.getDate())+'/'+pad(now.getMonth()+1)+'/'+now.getFullYear();
   const ov=openModal('<div class="dh">Xuất hình báo cáo đơn tồn động</div><div class="db"><div class="small muted" style="margin-bottom:8px">Lấy theo bộ lọc đang chọn ('+os.length+' dòng). Muốn ra hình riêng thì lọc trước theo người giữ / KD / tìm kiếm.</div>'+
     '<div class="row" style="margin-bottom:8px"><label class="fld" style="margin:0"><span>Khu vực</span><select id="irKv">'+(kvs.length>1?'<option value="*">Tất cả khu vực</option>':'')+kvs.map(k=>'<option>'+esc(k)+'</option>').join('')+'</select></label>'+
