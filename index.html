@@ -869,7 +869,8 @@ const PC_UNIT={TH:'Thùng',VIE:'Viên',M2:'m²',BAG:'Bao',KG:'Kg'};
 let pcGiaP=null;
 function pcLoadGia(){if(S.gia)return Promise.resolve(S.gia);if(pcGiaP)return pcGiaP;
   pcGiaP=fetch('gia.json?v='+Math.floor(Date.now()/36e5)).then(r=>{if(!r.ok)throw new Error('Không tải được bảng giá');return r.json()}).then(j=>{S.gia=j;return j}).catch(e=>{pcGiaP=null;throw e});return pcGiaP}
-function pcPack(d){const s=String(d||'').replace(/×/g,'x');const m=s.match(/(\d{2,4})\s*x\s*(\d{2,4})/i);if(!m)return null;
+const PC_NTM={NLL:6,NRK:10,CCR:10,NNG:10,CCN:10,CBK:5,CTK:5,CBY:5,NCT:5};
+function pcPack(d){const s=String(d||'').replace(/×/g,'x');const nt=s.match(/^\s*NTM\s+([A-Z]{3})/i);if(nt&&PC_NTM[nt[1].toUpperCase()])return [PC_NTM[nt[1].toUpperCase()],0];const m=s.match(/(\d{2,4})\s*x\s*(\d{2,4})/i);if(!m)return null;
   const a=+m[1],b=+m[2];const k1=Math.min(a,b)+'x'+Math.max(a,b);const cer=/^\s*CER/i.test(s);return (cer&&PC_PACK_CER[k1])||PC_PACK[k1]||null}
 function pcParts(l){const p=String(l.d||'').split(',').map(x=>x.trim());return {code:p[1]||l.m,loai:(p[2]||'').replace(/\.+$/,'')||'AA'}}
 function pcPrice(l){const g=S.gia&&S.gia.p&&S.gia.p[String(l.m).replace(/^0+/,'')];if(!g)return null;const [p,pu]=g;const u=String(l.u||'').toUpperCase();
