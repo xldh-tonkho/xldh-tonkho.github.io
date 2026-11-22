@@ -238,6 +238,7 @@ table.sap td.av{font-weight:700}
       </ol>
       <h3>Tính năng mới</h3>
       <ul>
+        <li><b>Phiếu đề nghị chừa hàng:</b> tab Đơn đang giữ → nút <b>Phiếu chừa</b> ở khung CH (hoặc tích chọn dòng → <b>Phiếu chừa hàng</b>) → kiểm tra mã KH, số SAP, đơn giá → <b>Tải file Word</b> hoặc <b>In / Lưu PDF</b>. Đơn giá lấy theo giá niêm yết SAP chưa thuế, cọc mặc định 20%, ngày kết thúc = ngày chừa + 10 ngày.</li>
         <li><b>Nhập file an toàn:</b> chọn đúng <b>Nhóm BH</b> (KV) khi file VA05 có nhiều nhóm; dòng lặp trong file tự bỏ; trên 300 dòng phải xác nhận lần 2; nhập nhầm → tab Nhập đơn chừa → <b>Các lần nhập file</b> → <b>Hoàn tác</b>.</li>
         <li><b>Đóng đơn theo VA05:</b> tab Nhập đơn chừa → mục <b>Đóng đơn đã xuất theo VA05</b> → chọn file VA05 → app tự chuyển Đã xuất / Hủy.</li>
         <li><b>Tổng quan:</b> số đơn chừa theo KV, KD, mã chừa nhiều nhất, lô sắp hết khả dụng.</li>
@@ -558,7 +559,7 @@ function renderOrders(){
     const nc=ro?9:10;
     return '<div class="ord"><div class="hd">'+(ro?'':'<input type="checkbox" class="selG" data-g="'+esc(G.key)+'" title="Chọn cả cửa hàng">')+'<span class="t">'+esc(G.ch)+'</span>'+kds.map(k=>'<span class="pill info">KD '+esc(k)+'</span>').join('')+
       '<span class="pill">'+G.ps.length+' phiếu · '+G.ls.length+' dòng · '+Object.entries(tot).map(([u,q])=>fmtN(q)+' '+esc(u)).join(' + ')+'</span>'+
-      (sos.length?sos.slice(0,4).map(s=>'<span class="pill ok">SAP '+esc(s)+'</span>').join('')+(sos.length>4?'<span class="small muted">+'+(sos.length-4)+'</span>':''):'<span class="pill warn">Chưa có số SAP</span>')+'<span class="sp"></span>'+
+      (sos.length?sos.slice(0,4).map(s=>'<span class="pill ok">SAP '+esc(s)+'</span>').join('')+(sos.length>4?'<span class="small muted">+'+(sos.length-4)+'</span>':''):'<span class="pill warn">Chưa có số SAP</span>')+'<span class="sp"></span>'+'<button class="btn sm pri" data-pch="'+esc(G.key)+'" title="Xuất phiếu đề nghị chừa hàng cho CH này">Phiếu chừa</button>'+
       (ro?'':(G.ps.length>1?'<button class="btn sm bad" data-cancelch="'+esc(G.key)+'">Hủy cả CH</button><button class="btn sm ok" data-closech="'+esc(G.key)+'">'+doneLbl()+' cả CH</button>':'<button class="btn sm" data-so="'+esc(G.ps[0].no)+'">'+(G.ps[0].o.so?'Sửa số SAP':'Nhập số SAP')+'</button><button class="btn sm bad" data-cancelall="'+esc(G.ps[0].no)+'">Hủy đơn</button><button class="btn sm ok" data-closeall="'+esc(G.ps[0].no)+'">'+doneLbl()+' cả đơn</button>'))+
       '</div><div style="overflow:auto"><table><thead><tr>'+(ro?'':'<th style="width:26px"></th>')+'<th>Mã</th><th>Tên hàng</th><th>Kho</th><th>Lô</th><th class="n">SL giữ</th><th>ĐVT</th><th class="n">Khả dụng lô</th><th></th></tr></thead><tbody>'+
       G.ps.map(P=>{const o=P.o;
@@ -578,6 +579,7 @@ async function setStatus(ids,status){
 async function onOrdersClick(e){
   const b=e.target.closest('button');if(!b)return;const d=b.dataset;
   const byId=id=>S.orders.find(o=>o.id===id);
+  if(d.pch){const vis=new Set(S._olist||[]);openPhieuChua(S.orders.filter(o=>vis.has(o.id)&&chKey(o.ch)===d.pch));return}
   if(d.close){const o=byId(d.close);if(o&&await confirmBox(doneLbl(),'<b>'+esc(o.m)+'</b> lô '+esc(o.b)+' · '+fmtN(o.qty)+' '+esc(o.u)+' của <b>'+esc(o.ch)+'</b> '+(useA0()?'đã tạo đơn trên SAP (SAP đã trừ khả dụng)?':'đã xuất kho trên SAP?'),doneLbl()))await setStatus([o.id],'xong')}
   else if(d.cancel){const o=byId(d.cancel);if(o&&await confirmBox('Hủy giữ hàng','Hủy dòng <b>'+esc(o.m)+'</b> · '+fmtN(o.qty)+' '+esc(o.u)+' của <b>'+esc(o.ch)+'</b>? Số lượng trả lại khả dụng.','Hủy dòng',true))await setStatus([o.id],'huy')}
   else if(d.closech||d.cancelch){const key=d.closech||d.cancelch;const vis=new Set(S._olist||[]);const ls=S.orders.filter(o=>vis.has(o.id)&&chKey(o.ch)===key);const st=d.closech?'xong':'huy';if(!ls.length)return;
@@ -705,7 +707,7 @@ function updateSelUI(){const box=$('#orderList'),bar=$('#selBar');if(!box||!bar)
   const vis=S._olist||[];if(ro||!vis.length){bar.innerHTML=S.sel.size&&!ro?'<div class="card"><div class="row"><b>Đã chọn '+S.sel.size+' dòng</b> (không nằm trong bộ lọc hiện tại)<span style="flex:1"></span><button class="btn sm" id="selClr">Bỏ chọn</button><button class="btn sm bad" id="selDel">Hủy '+S.sel.size+' dòng đã chọn</button></div></div>':'';return}
   const nv=vis.filter(id=>S.sel.has(id)).length;const hid=S.sel.size-nv;const nDon=new Set(S.orders.filter(o=>S.sel.has(o.id)).map(o=>o.orderNo)).size;
   bar.innerHTML='<div class="card"><div class="row"><label style="display:flex;gap:8px;align-items:center;cursor:pointer;font-weight:600"><input type="checkbox" id="selAll"> Chọn tất cả '+vis.length+' dòng đang lọc</label><span style="flex:1"></span>'+
-    (S.sel.size?'<b>Đã chọn '+S.sel.size+' dòng ('+nDon+' đơn)</b>'+(hid?'<span class="small muted">'+hid+' dòng không nằm trong bộ lọc hiện tại</span>':'')+'<button class="btn sm" id="selClr">Bỏ chọn</button><button class="btn sm bad" id="selDel">Hủy '+S.sel.size+' dòng đã chọn</button>':'<span class="small muted">Tích ô vuông để chọn từng dòng hoặc cả đơn · giữ Shift để chọn liền một khoảng</span>')+'</div></div>';
+    (S.sel.size?'<b>Đã chọn '+S.sel.size+' dòng ('+nDon+' đơn)</b>'+(hid?'<span class="small muted">'+hid+' dòng không nằm trong bộ lọc hiện tại</span>':'')+'<button class="btn sm" id="selClr">Bỏ chọn</button><button class="btn sm pri" id="selPch">Phiếu chừa hàng</button><button class="btn sm bad" id="selDel">Hủy '+S.sel.size+' dòng đã chọn</button>':'<span class="small muted">Tích ô vuông để chọn từng dòng hoặc cả đơn · giữ Shift để chọn liền một khoảng</span>')+'</div></div>';
   const a=$('#selAll');a.checked=!!nv&&nv===vis.length;a.indeterminate=nv>0&&nv<vis.length}
 let _lastSel=null;
 $('#orderList').addEventListener('click',e=>{const c=e.target;if(!(c instanceof HTMLInputElement)||c.type!=='checkbox')return;
@@ -716,6 +718,7 @@ $('#orderList').addEventListener('click',e=>{const c=e.target;if(!(c instanceof 
   else if(c.classList.contains('selG')){const on=c.checked;$('#orderList').querySelectorAll('input.selL').forEach(x=>{if(x.dataset.g===c.dataset.g)on?S.sel.add(x.dataset.id):S.sel.delete(x.dataset.id)});updateSelUI()}});
 $('#selBar').addEventListener('click',async e=>{const t=e.target;
   if(t.id==='selAll'){(S._olist||[]).forEach(id=>t.checked?S.sel.add(id):S.sel.delete(id));updateSelUI()}
+  else if(t.id==='selPch'){openPhieuChua(S.orders.filter(o=>S.sel.has(o.id)))}
   else if(t.id==='selClr'){S.sel.clear();_lastSel=null;updateSelUI()}
   else if(t.id==='selDel'){if(!S.canWrite){toast('Tài khoản không có quyền hủy',true);return}
     const list=S.orders.filter(o=>S.sel.has(o.id));if(!list.length){S.sel.clear();updateSelUI();return}
@@ -859,6 +862,94 @@ $('#exportRpt').onclick=exportReport;
 /* ---------- quyền KD, danh mục, dòng báo cáo ---------- */
 const canW=r=>r!=='xem'&&r!=='kd';
 const nmK=x=>String(x||'').split(String.fromCharCode(0x200b)).join('').toLowerCase().replace(/\s+/g,' ').trim();
+/* ---------- phiếu đề nghị chừa hàng (CPĐT_QĐ_KHKD_04/BM01) ---------- */
+const PC_PACK={'100x200':[25,.5],'150x300':[11,.5],'150x600':[10,.9],'200x200':[12,.48],'200x800':[10,1.6],'200x1200':[6,1.44],'300x300':[11,.99],'300x450':[8,1.08],'300x600':[6,1.08],'400x400':[6,.96],'400x800':[4,1.28],'600x600':[4,1.44],'600x1200':[2,1.44],'800x800':[3,1.92],'1000x1000':[2,2]};
+const PC_PACK_CER={'200x200':[25,1]};
+const PC_UNIT={TH:'Thùng',VIE:'Viên',M2:'m²',BAG:'Bao',KG:'Kg'};
+let pcGiaP=null;
+function pcLoadGia(){if(S.gia)return Promise.resolve(S.gia);if(pcGiaP)return pcGiaP;
+  pcGiaP=fetch('gia.json?v='+Math.floor(Date.now()/36e5)).then(r=>{if(!r.ok)throw new Error('Không tải được bảng giá');return r.json()}).then(j=>{S.gia=j;return j}).catch(e=>{pcGiaP=null;throw e});return pcGiaP}
+function pcPack(d){const s=String(d||'').replace(/×/g,'x');const m=s.match(/(\d{2,4})\s*x\s*(\d{2,4})/i);if(!m)return null;
+  const a=+m[1],b=+m[2];const k1=Math.min(a,b)+'x'+Math.max(a,b);const cer=/^\s*CER/i.test(s);return (cer&&PC_PACK_CER[k1])||PC_PACK[k1]||null}
+function pcParts(l){const p=String(l.d||'').split(',').map(x=>x.trim());return {code:p[1]||l.m,loai:(p[2]||'').replace(/\.+$/,'')||'AA'}}
+function pcPrice(l){const g=S.gia&&S.gia.p&&S.gia.p[String(l.m).replace(/^0+/,'')];if(!g)return null;const [p,pu]=g;const u=String(l.u||'').toUpperCase();
+  if(!u||pu===u)return p;const pk=pcPack(l.d);if(!pk)return null;
+  if(pu==='TH'&&u==='VIE')return p/pk[0];if(pu==='VIE'&&u==='TH')return p*pk[0];if(pu==='M2'&&u==='TH')return p*pk[1];if(pu==='TH'&&u==='M2')return p/pk[1];return null}
+function pcQty(q,u,d){q=r3(q);if(String(u).toUpperCase()!=='TH')return fmtN(q);const pk=pcPack(d);const t=Math.floor(q+1e-9);const fr=r3(q-t);
+  if(fr<0.0005||!pk)return fmtN(q);const v=Math.round(fr*pk[0]);return (t?t+'T':'')+v+'V'}
+const pcMoney=n=>Math.round(n).toLocaleString('en-US');
+function pcExactQ(q,u,d){q=r3(q);const pk=String(u).toUpperCase()==='TH'&&pcPack(d);if(!pk)return q;const t=Math.floor(q+1e-9);return t+Math.round((q-t)*pk[0])/pk[0]}
+function pcAmt(R){return R.price==null?null:Math.round(pcExactQ(R.qty,R.u,R.d)*R.price)}
+const pcD=s=>{if(!s)return'';const p=s.split('-');return p[2]+'/'+p[1]+'/'+p[0]};
+function pcAddDays(s,n){const d=new Date(s+'T00:00:00');d.setDate(d.getDate()+n);return d.getFullYear()+'-'+pad(d.getMonth()+1)+'-'+pad(d.getDate())}
+function pcRows(lines){const m=new Map();
+  for(const l of lines){const k=[l.m,l.b,l.u].join('|');if(!m.has(k))m.set(k,{m:l.m,d:l.d,b:l.b,u:l.u,qty:0,locs:new Map()});const R=m.get(k);R.qty=r3(R.qty+(+l.qty||0));
+    const lk=l.p+(l.s?'/'+l.s:'');R.locs.set(lk,{p:l.p,s:l.s,q:r3(((R.locs.get(lk)||{}).q||0)+(+l.qty||0))})}
+  return [...m.values()].map(R=>{const pp=pcParts(R);const pr=pcPrice(R);return Object.assign(R,pp,{price:pr==null?null:Math.round(pr)})})}
+function pcKho(R){const L=[...R.locs.values()];if(L.length===1){const x=L[0];return 'Kho '+esc(x.p)+(x.s?' ('+esc(x.s)+')':'')}
+  return L.map(x=>esc(x.p)+(x.s?'/'+esc(x.s):'')+': '+pcQty(x.q,R.u,R.d)+(String(R.u).toUpperCase()==='TH'&&!/V$/.test(pcQty(x.q,R.u,R.d))?'T':'')).join('<br>')}
+function pcDoc(H,rows){const tot=rows.reduce((t,R)=>t+(pcAmt(R)||0),0);const coc=Math.round(tot*H.pct/100);
+  const td='border:1px solid #000;padding:2px 3px;font-size:9.5pt;vertical-align:middle;';const nw='white-space:nowrap;';
+  const sig=(c2)=>'<table style="width:100%;border-collapse:collapse;margin-top:6px"><tr>'+['Đề nghị',c2,'Xem xét','Phê duyệt'].map((t,i)=>'<td style="border:1px solid #000;width:25%;height:95px;vertical-align:top;text-align:center;font-size:11pt;padding:3px">Ngày…./……/……<br>'+t+'</td>').join('')+'</tr></table>';
+  return '<table style="width:100%;border-collapse:collapse"><tr><td style="border:1px solid #000;width:55%;text-align:center;font-weight:bold;font-size:14pt;padding:10px 6px">PHIẾU ĐỀ NGHỊ CHỪA HÀNG -<br>GIA HẠN CHỪA HÀNG</td>'+
+    '<td style="border:1px solid #000;font-size:11pt;padding:6px 8px">Số hiệu: CPĐT_QĐ_KHKD_04/BM01<br>Ngày hiệu lực : 03/06/2024</td></tr></table>'+
+    '<p style="margin:8px 0 3px;font-size:12pt">Chi nhánh: '+esc(H.cn)+'</p>'+
+    '<p style="margin:3px 0;font-size:12pt">Công ty/ Đơn vị mua hàng: '+esc(H.ct)+(H.kh?' (Code: '+esc(H.kh)+')':'')+'</p>'+
+    '<p style="margin:3px 0;font-size:12pt">Đơn hàng SAP số: '+esc(H.so)+'</p>'+
+    '<p style="margin:3px 0;font-size:12pt">Ngày bắt đầu chừa hàng: '+pcD(H.d1)+'&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Ngày kết thúc chừa hàng: '+pcD(H.d2)+'</p>'+
+    '<p style="margin:3px 0 6px;font-size:12pt"><b>Lý do chừa hàng: '+esc(H.ld)+'</b></p>'+
+    '<table style="width:100%;border-collapse:collapse;table-layout:fixed"><tr>'+[['Mã hàng<br>mã SAP/DM',22],['Loại',5],['Lô',12],['Đvt',7],['Số lượng',7],['Đơn giá lẻ chưa thuế',11],['Thành tiền (VND)',13],['Kho chừa',15],['Số lượng gia hạn',8]].map(t=>'<th width="'+t[1]+'%" style="'+td+'width:'+t[1]+'%;background:#d9d9d9;text-align:center;font-weight:bold">'+t[0]+'</th>').join('')+'</tr>'+
+    rows.map(R=>'<tr><td style="'+td+'">'+esc(R.code)+'<br>'+esc(R.m)+'</td><td style="'+td+'text-align:center">'+esc(R.loai)+'</td><td style="'+td+'text-align:center">'+esc(R.b)+'</td><td style="'+td+'text-align:center">'+esc(PC_UNIT[String(R.u).toUpperCase()]||R.u)+'</td><td style="'+td+'text-align:center">'+pcQty(R.qty,R.u,R.d)+'</td>'+
+      '<td style="'+td+'text-align:right">'+(R.price==null?'':pcMoney(R.price))+'</td><td style="'+td+'text-align:right">'+(R.price==null?'':pcMoney(pcAmt(R)))+'</td><td style="'+td+'text-align:center">'+pcKho(R)+'</td><td style="'+td+'"></td></tr>').join('')+
+    '<tr><td colspan="6" style="'+td+'text-align:right;font-weight:bold">Tổng trị giá lô hàng:</td><td style="'+td+'text-align:right;font-weight:bold">'+pcMoney(tot)+'</td><td style="'+td+'"></td><td style="'+td+'"></td></tr>'+
+    '<tr><td colspan="6" style="'+td+'text-align:right;font-weight:bold">Tiền cọc ('+H.pct+'%):</td><td style="'+td+'text-align:right;font-weight:bold">'+pcMoney(coc)+'</td><td style="'+td+'"></td><td style="'+td+'"></td></tr></table>'+
+    sig('Xác nhận thanh toán/<br>tiền cọc')+
+    '<p style="margin:10px 0 3px;font-size:12pt"><b>GIA HẠN CHỪA HÀNG:</b></p><p style="margin:3px 0;font-size:12pt">Ngày bắt đầu gia hạn: …………………………… Ngày kết thúc gia hạn: ……………………………</p>'+
+    '<p style="margin:3px 0;font-size:12pt">Lý do gia hạn: ………………………………………………………………………………</p>'+sig('Xác nhận thanh toán/<br>tiền cọc')}
+function pcWrap(body,title){return '<html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:w="urn:schemas-microsoft-com:office:word" xmlns="http://www.w3.org/TR/REC-html40"><head><meta charset="utf-8"><title>'+esc(title)+'</title>'+
+  '<!--[if gte mso 9]><xml><w:WordDocument><w:View>Print</w:View><w:Zoom>100</w:Zoom></w:WordDocument></xml><![endif]-->'+
+  '<style>@page{size:21cm 29.7cm;margin:1.5cm 1.5cm 1.5cm 1.8cm}@page Section1{size:21cm 29.7cm;margin:1.5cm 1.5cm 1.5cm 1.8cm}div.Section1{page:Section1}body{font-family:"Times New Roman",serif;font-size:12pt;color:#000}table{mso-table-lspace:0;mso-table-rspace:0}@media print{.np{display:none}}</style></head><body><div class="Section1">'+body+'</div></body></html>'}
+async function openPhieuChua(lines){
+  if(!lines||!lines.length){toast('Chưa có dòng nào để làm phiếu',true);return}
+  try{await pcLoadGia()}catch(e){toast(errMsg(e)+' – vẫn làm phiếu được, tự nhập đơn giá',true)}
+  try{await getDM()}catch(e){}
+  const o=lines[0];const rv=resolveO(o);const chs=[...new Set(lines.map(l=>clean(String(l.ch).split(String.fromCharCode(8203)).join(''))))];
+  const sos=[...new Set(lines.map(l=>l.so).filter(Boolean))];const khs=[...new Set(lines.map(l=>resolveO(l).kh).filter(Boolean))];
+  let sv={};try{sv=JSON.parse(localStorage.getItem('pcLast')||'{}')}catch(e){}
+  const rows=pcRows(lines);const today=todayStr();
+  const ov=openModal('<div class="dh"><span>Phiếu đề nghị chừa hàng</span><span class="small muted">'+lines.length+' dòng giữ → '+rows.length+' dòng phiếu</span></div><div class="db">'+
+    (chs.length>1?'<div class="banner warn">Các dòng đã chọn thuộc '+chs.length+' CH / khách khác nhau – phiếu chỉ ghi 1 tên khách, kiểm tra lại.</div>':'')+
+    '<div class="grid2"><label class="fld"><span>Chi nhánh</span><input type="text" id="pcCn" value="'+esc(sv.cn||'HCM KV23')+'"></label>'+
+    '<label class="fld"><span>Đơn hàng SAP số</span><input type="text" id="pcSo" value="'+esc(sos.join(', '))+'"></label>'+
+    '<label class="fld"><span>Công ty / Đơn vị mua hàng</span><input type="text" id="pcCt" value="'+esc(chs[0]||'')+'"></label>'+
+    '<label class="fld"><span>Mã KH (Code)</span><input type="text" id="pcKh" value="'+esc(khs[0]||rv.kh||'')+'" placeholder="Ví dụ 101293"></label>'+
+    '<label class="fld"><span>Ngày bắt đầu chừa hàng</span><input type="date" id="pcD1" value="'+today+'"></label>'+
+    '<label class="fld"><span>Ngày kết thúc chừa hàng (tự +10 ngày)</span><input type="date" id="pcD2" value="'+pcAddDays(today,10)+'"></label>'+
+    '<label class="fld"><span>Lý do chừa hàng</span><input type="text" id="pcLd" value="'+esc(sv.ld||'Công trình chưa tới tiến độ cần hàng')+'"></label>'+
+    '<label class="fld"><span>Tiền cọc (% giá trị đơn)</span><input type="number" id="pcPct" min="0" step="any" value="20"></label></div>'+
+    '<div class="tw" id="pcTbl" style="max-height:380px"></div><div id="pcSum" style="margin-top:10px"></div>'+
+    '<div class="small muted" style="margin-top:6px">Đơn giá tự lấy theo <b>giá niêm yết SAP chưa thuế</b> ('+esc((S.gia&&S.gia.v)||'chưa tải')+'); Viên = giá thùng ÷ số viên/thùng. Sửa đơn giá trực tiếp trong bảng nếu đơn có giá riêng.</div>'+
+    '</div><div class="df"><button class="btn" data-x>Đóng</button><button class="btn" id="pcPrint">In / Lưu PDF</button><button class="btn pri" id="pcDoc">Tải file Word</button></div>',true);
+  const draw=()=>{const pct=+ov.querySelector('#pcPct').value||0;let tot=0,miss=0;
+    ov.querySelector('#pcTbl').innerHTML='<table><thead><tr><th>Mã hàng / mã SAP</th><th>Loại</th><th>Lô</th><th>ĐVT</th><th class="n">SL</th><th class="n">Đơn giá chưa thuế</th><th class="n">Thành tiền</th><th>Kho chừa</th></tr></thead><tbody>'+
+      rows.map((R,i)=>{const tt=pcAmt(R);if(tt==null)miss++;else tot+=tt;
+        return '<tr><td><b>'+esc(R.code)+'</b><br><span class="small muted">'+esc(R.m)+'</span></td><td>'+esc(R.loai)+'</td><td>'+esc(R.b)+'</td><td>'+esc(PC_UNIT[String(R.u).toUpperCase()]||R.u)+'</td><td class="n">'+pcQty(R.qty,R.u,R.d)+'</td>'+
+        '<td class="n"><input type="number" step="any" data-pr="'+i+'" value="'+(R.price==null?'':R.price)+'" style="width:120px;text-align:right'+(R.price==null?';border-color:var(--bad)':'')+'"></td><td class="n">'+(tt==null?'<span class="pill bad">thiếu giá</span>':pcMoney(tt))+'</td><td class="small">'+pcKho(R)+'</td></tr>'}).join('')+'</tbody></table>';
+    ov.querySelector('#pcSum').innerHTML='<div class="big3"><div><span>Tổng trị giá lô hàng</span><b>'+pcMoney(tot)+'</b></div><div><span>Tiền cọc '+pct+'%</span><b class="held">'+pcMoney(tot*pct/100)+'</b></div><div><span>Dòng thiếu giá</span><b style="color:'+(miss?'var(--bad)':'inherit')+'">'+miss+'</b></div></div>';
+    ov.querySelectorAll('[data-pr]').forEach(inp=>inp.onchange=()=>{const v=inp.value===''?null:Math.round(+inp.value);rows[+inp.dataset.pr].price=v>0?v:null;draw()})};
+  draw();
+  ov.querySelector('#pcPct').oninput=draw;
+  ov.querySelector('#pcD1').onchange=e=>{if(e.target.value)ov.querySelector('#pcD2').value=pcAddDays(e.target.value,10)};
+  ov.querySelector('[data-x]').onclick=()=>ov.remove();
+  const head=()=>{const g=id=>clean(ov.querySelector(id).value);const H={cn:g('#pcCn'),ct:g('#pcCt'),kh:g('#pcKh'),so:g('#pcSo'),d1:g('#pcD1'),d2:g('#pcD2'),ld:g('#pcLd'),pct:+g('#pcPct')||0};
+    try{localStorage.setItem('pcLast',JSON.stringify({cn:H.cn,ld:H.ld}))}catch(e){}return H};
+  const check=()=>{const miss=rows.filter(R=>R.price==null).length;return !miss||confirm(miss+' dòng chưa có đơn giá – vẫn xuất phiếu?')};
+  const fname=H=>(H.ct||'Phieu').replace(/[\\/:*?"<>|]+/g,' ').trim()+' - Phieu chua hang '+pcD(H.d1).replace(/\//g,'.');
+  ov.querySelector('#pcDoc').onclick=()=>{if(!check())return;const H=head();const html=pcWrap(pcDoc(H,rows),fname(H));
+    const blob=new Blob(['﻿',html],{type:'application/msword'});const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=fname(H)+'.doc';document.body.appendChild(a);a.click();setTimeout(()=>{URL.revokeObjectURL(a.href);a.remove()},1500);toast('Đã tải file Word phiếu chừa hàng')};
+  ov.querySelector('#pcPrint').onclick=()=>{if(!check())return;const H=head();const w=window.open('','_blank');if(!w){toast('Trình duyệt chặn cửa sổ in – cho phép popup rồi bấm lại',true);return}
+    w.document.open();w.document.write(pcWrap('<div class="np" style="font:13px system-ui;margin-bottom:10px;padding:8px;background:#fff4e0;border-radius:6px">Chọn máy in <b>Lưu dưới dạng PDF</b> để lưu file. <button onclick="print()">In / Lưu PDF</button></div>'+pcDoc(H,rows),fname(H)));w.document.close();setTimeout(()=>{try{w.focus();w.print()}catch(e){}},400)};
+}
 async function getDM(force){if(!force&&S.dm&&Date.now()-S.dm.at<5*60000)return S.dm;const dm=await api('getDanhMuc');S.dm={kv:dm.kv||[],kh:dm.kh||[],at:Date.now()};S.dmIdx=null;return S.dm}
 function dmIdx(){if(S.dmIdx&&S.dmIdx.at===S.dm.at)return S.dmIdx;const kvOf={},byCode={},byName={};
   (S.dm.kv||[]).forEach(r=>{if(r[0])kvOf[r[0]]=r[1]});(S.dm.kh||[]).forEach(r=>{const o={code:r[0],name:r[1],sg:r[2],kd:r[3]};if(r[0])byCode[r[0]]=o;if(r[1]&&!byName[nmK(r[1])])byName[nmK(r[1])]=o});
