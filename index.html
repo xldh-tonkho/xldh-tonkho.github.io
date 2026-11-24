@@ -207,6 +207,18 @@ table.sap td.av{font-weight:700}
 #irBox{background:var(--soft)!important}
 #reconcile .card{border-color:color-mix(in srgb,var(--bad) 30%,transparent)!important}
 
+.msel{position:relative}
+.msel-btn{border:1px solid var(--line2);border-radius:10px;padding:8px 32px 8px 12px;min-height:38px;background:var(--field) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%2398a2b3' stroke-width='2.4' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E") right 9px center/15px no-repeat;cursor:pointer;max-width:280px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;text-align:left;width:100%}
+.msel-btn.on{border-color:var(--pri);color:var(--pri-ink);background-color:var(--pri-soft);font-weight:600}
+.msel-pop{position:absolute;top:calc(100% + 6px);left:0;z-index:15;background:var(--card);border:1px solid var(--line);border-radius:14px;box-shadow:var(--sh2);min-width:280px;max-height:360px;overflow:auto;padding:6px}
+.msel-hd{display:flex;gap:6px;padding:4px 6px 8px;border-bottom:1px solid var(--line);margin-bottom:4px}
+.msel-ft{display:flex;gap:8px;align-items:center;justify-content:space-between;padding:8px 6px 4px;border-top:1px solid var(--line);margin-top:4px;position:sticky;bottom:-6px;background:var(--card)}
+.msel-it{display:flex;gap:10px;align-items:center;padding:8px 10px;border-radius:8px;cursor:pointer}
+.msel-it:hover{background:var(--soft)}.msel-it input{width:17px;height:17px;margin:0}.msel-it span{color:var(--mute);font-size:12.5px}
+td.pd{white-space:normal;min-width:200px}
+.kq{display:inline-flex;gap:5px;align-items:baseline;border-radius:7px;padding:1px 8px;margin:2px 4px 2px 0;font-size:12px;background:var(--soft);border:1px solid var(--line);color:var(--ink2)}
+.kq b{font-variant-numeric:tabular-nums}.kq.pos b{color:var(--ok)}.kq.zero b{color:var(--warn)}.kq.neg b{color:var(--bad)}
+@media (max-width:640px){.msel{flex:1 1 40%}.msel-btn{max-width:none}.msel-pop{min-width:0;width:calc(100vw - 52px)}}
 /* ---------- điện thoại ---------- */
 @media (max-width:1023px){
   nav{position:fixed;left:0;right:0;bottom:0;z-index:40;background:var(--card);border-top:1px solid var(--line);padding:6px 4px calc(6px + env(safe-area-inset-bottom));gap:0;justify-content:space-around;box-shadow:0 -4px 16px rgba(16,24,40,.06)}
@@ -271,9 +283,9 @@ table.sap td.av{font-weight:700}
       <div class="row">
         <input type="search" id="q" class="grow" aria-label="Tìm mã hàng, tên hàng hoặc số lô" placeholder="Tìm mã hàng, tên hàng hoặc số lô… (gõ nhiều từ để lọc kỹ hơn)">
         <button type="button" class="btn hide" id="scanBtn" title="Quét mã vạch bằng camera">📷 Quét mã</button>
-        <select id="fPlant" aria-label="Lọc theo kho"><option value="">Tất cả kho</option></select>
+        <div class="msel" id="fPlantBox"><button type="button" class="msel-btn" id="fPlantBtn" aria-haspopup="true" aria-expanded="false" aria-label="Chọn kho (chọn được nhiều kho)">Tất cả kho</button><div class="msel-pop hide" id="fPlantPop" role="group" aria-label="Chọn kho"></div></div>
         <select id="fSloc" aria-label="Lọc theo kho con"><option value="">Tất cả kho con</option></select>
-        <div class="seg" id="mode" role="group" aria-label="Cách xem"><button type="button" data-m="lot" class="on" aria-pressed="true">Theo lô</button><button type="button" data-m="mat" aria-pressed="false">Theo mã</button></div>
+        <div class="seg" id="mode" role="group" aria-label="Cách xem"><button type="button" data-m="lot" class="on" aria-pressed="true">Theo lô</button><button type="button" data-m="mat" aria-pressed="false">Theo mã</button><button type="button" data-m="sum" aria-pressed="false" title="Mỗi mã một dòng: cộng tồn các kho đã chọn, kèm khả dụng từng kho">Gộp kho</button></div>
         <label class="chk"><input type="checkbox" id="onlyAvail"> Chỉ còn khả dụng</label>
         <label class="chk"><input type="checkbox" id="onlyHeld"> Chỉ dòng đang giữ</label>
         <button class="btn" id="copyStock" title="Sao chép bảng đang lọc để dán vào Excel/Zalo">Sao chép bảng</button>
@@ -399,6 +411,12 @@ table.sap td.av{font-weight:700}
         <li>Nhiều đơn cùng lúc: <b>Đóng theo danh sách số đơn SAP</b> → dán danh sách số đơn → app đóng hết các đơn khớp số.</li>
         <li><b>Quan trọng:</b> hàng đã xuất mà không đóng đơn thì bị trừ 2 lần (Hàng có sẵn đã giảm + app vẫn giữ). Khung <b>Cần kiểm tra</b> ở tab Đơn đang giữ sẽ nhắc các dòng nghi đã xuất.</li>
       </ol>
+      <h3>Xem một mã trên nhiều kho</h3>
+      <ol>
+        <li>Tab Tồn khả dụng → bấm ô <b>Tất cả kho</b> → tích các kho muốn xem → <b>Xong</b>. Không tích kho nào là xem tất cả kho.</li>
+        <li>Gõ mã hàng vào ô tìm, chọn cách xem <b>Gộp kho</b>: mỗi mã một dòng, cột <b>Khả dụng (tổng)</b> cộng các kho đã chọn, cột <b>Khả dụng từng kho</b> ghi riêng từng kho.</li>
+        <li>Bấm vào dòng để xem chi tiết từng lô ở các kho đã chọn.</li>
+      </ol>
       <h3>Tài khoản</h3>
       <ol>
         <li>Quản trị thêm người dùng ở trang <b>TaiKhoan</b> trong file Google Sheet của app: Tên đăng nhập · Mật khẩu · Họ tên · Quyền · Hoạt động.</li>
@@ -447,7 +465,7 @@ const countBy=(list,f)=>{const m={};list.forEach(o=>{const k=f(o)||'—';m[k]=(m
 const S={sel:new Set(),_olist:[],db:null,user:null,meId:null,canWrite:null,canAdmin:false,
   meta:null,metaLoaded:false,stock:[],stockByKey:new Map(),plants:[],slocs:[],
   orders:[],ordersLoaded:false,resv:new Map(),cart:[],names:{},
-  view:{q:'',plant:'',sloc:'',onlyAvail:false,onlyHeld:false,mode:'lot',sort:'m',dir:1,limit:200},
+  view:{q:'',plants:[],sloc:'',onlyAvail:false,onlyHeld:false,mode:'lot',sort:'m',dir:1,limit:200},
   imp:null,tab:'stock'};
 
 /* ---------- modal helpers ---------- */
@@ -492,29 +510,36 @@ const L=()=>Object.assign({p:'Plant',n:'Name 1',m:'Mat.',d:'Material Description
 const has=f=>!!(S.meta&&S.meta.cols&&S.meta.cols.includes(f));
 
 function fillFilters(){
-  const fp=$('#fPlant'),fs=$('#fSloc');const vp=fp.value,vs=fs.value;
-  fp.innerHTML='<option value="">Tất cả kho</option>'+S.plants.map(p=>'<option value="'+esc(p)+'"'+(p===vp?' selected':'')+'>'+esc(p)+(S.pName&&S.pName[p]?' – '+esc(S.pName[p]):'')+'</option>').join('');
+  const fs=$('#fSloc');const vs=fs.value;
+  S.view.plants=S.view.plants.filter(p=>S.plants.includes(p));renderPlantPick();
   fs.innerHTML='<option value="">Tất cả kho con</option>'+S.slocs.map(p=>'<option'+(p===vs?' selected':'')+'>'+esc(p)+'</option>').join('');
 }
 
+function plantLbl(){const P=S.view.plants;if(!P.length)return 'Tất cả kho';if(P.length===1)return 'Kho '+P[0]+(S.pName&&S.pName[P[0]]?' – '+S.pName[P[0]]:'');return P.length+' kho: '+P.join(', ')}
+function renderPlantPick(){const P=S.view.plants,btn=$('#fPlantBtn');btn.textContent=plantLbl();btn.classList.toggle('on',P.length>0);
+  $('#fPlantPop').innerHTML='<div class="msel-hd"><button type="button" class="btn sm" data-all>Chọn hết</button><button type="button" class="btn sm" data-none>Bỏ chọn</button></div>'+
+    S.plants.map(p=>'<label class="msel-it"><input type="checkbox" value="'+esc(p)+'"'+(P.includes(p)?' checked':'')+'><b>'+esc(p)+'</b><span>'+esc(S.pName&&S.pName[p]||'')+'</span></label>').join('')+
+    '<div class="msel-ft"><span class="small muted">Không chọn kho nào = xem tất cả kho</span><button type="button" class="btn sm pri" data-done>Xong</button></div>'}
+function setPlants(list){S.view.plants=list;S.view.limit=200;renderPlantPick();renderStock()}
 function currentRows(){
   const V=S.view,terms=norm(V.q).split(/\s+/).filter(Boolean);
   let rows=[];
   for(const r of S.stock){
-    if(V.plant&&r.p!==V.plant)continue;if(V.sloc&&r.s!==V.sloc)continue;
+    if(V.plants.length&&!V.plants.includes(r.p))continue;if(V.sloc&&r.s!==V.sloc)continue;
     if(terms.length&&!terms.every(t=>r._n.includes(t)))continue;
     const h=heldOf(r.k);const a0=(r.a0===''||r.a0==null)?null:+r.a0;rows.push({r,m:r.m,d:r.d,p:r.p,n:r.n,s:r.s,x:r.x,g:r.g,b:r.b,u:r.u,q:r.q,a0,h,a:r3(baseOf(r)-h),k:r.k,lots:1});
   }
   // reservations whose lot no longer in stock (show as negative rows)
   for(const [k,x] of S.resv){if(S.stockByKey.has(k))continue;const o=x.list[0];
-    if(V.plant&&o.p!==V.plant)continue;if(V.sloc&&o.s!==V.sloc)continue;
+    if(V.plants.length&&!V.plants.includes(o.p))continue;if(V.sloc&&o.s!==V.sloc)continue;
     if(terms.length&&!terms.every(t=>norm(o.m+' '+o.d+' '+o.b).includes(t)))continue;
     rows.push({r:null,m:o.m,d:o.d,p:o.p,n:o.n||'',s:o.s,x:o.x||'',g:o.g||'',b:o.b,u:o.u,q:0,a0:0,h:x.q,a:r3(-x.q),k,lots:1,gone:true})}
-  if(V.mode==='mat'){const g=new Map();
-    for(const x of rows){const gk=x.m+'\u0001'+x.p;const y=g.get(gk);
-      if(!y)g.set(gk,{m:x.m,d:x.d,p:x.p,n:x.n,s:'',x:'',b:'',g:x.g,u:x.u,q:x.q,a0:x.a0,h:x.h,a:x.a,lots:1,k:gk});
-      else{y.q=r3(y.q+x.q);if(x.a0!=null)y.a0=r3((y.a0||0)+x.a0);y.h=r3(y.h+x.h);y.a=r3(y.a+x.a);y.lots++}}
-    rows=[...g.values()]}
+  if(V.mode==='mat'||V.mode==='sum'){const g=new Map(),sum=V.mode==='sum';
+    for(const x of rows){const gk=sum?x.m:x.m+'\u0001'+x.p;let y=g.get(gk);
+      if(!y){y={m:x.m,d:x.d,p:x.p,n:x.n,s:'',x:'',b:'',g:x.g,u:x.u,q:x.q,a0:x.a0,h:x.h,a:x.a,lots:1,k:gk,pd:new Map()};g.set(gk,y)}
+      else{y.q=r3(y.q+x.q);if(x.a0!=null)y.a0=r3((y.a0||0)+x.a0);y.h=r3(y.h+x.h);y.a=r3(y.a+x.a);y.lots++}
+      if(sum)y.pd.set(x.p,r3((y.pd.get(x.p)||0)+x.a))}
+    rows=[...g.values()];if(sum)rows.forEach(y=>{y.np=y.pd.size;y.p=[...y.pd.keys()].sort().join(', ')})}
   if(V.onlyAvail)rows=rows.filter(x=>x.a>0.0005);
   if(V.onlyHeld)rows=rows.filter(x=>x.h>0.0005);
   const f=V.sort,dir=V.dir;
@@ -554,9 +579,9 @@ function renderStock(){
   if(!S.stock.length&&!S.orders.length){box.innerHTML='<div class="empty">Chưa có dữ liệu tồn. Kiểm tra file Google Sheet “Thông tin tồn kho” rồi bấm <b>Tải lại</b> (góc trên bên phải).</div>';$('#more').classList.add('hide');return}
   const rows=currentRows();const V=S.view;const lot=V.mode==='lot';
   const shown=rows.slice(0,V.limit);const Lb=L();
-  const cols=[['p',Lb.p],has('n')&&['n',Lb.n],['m',Lb.m],['d',Lb.d]];
+  const sum=V.mode==='sum';const cols=sum?[['m',Lb.m],['d',Lb.d],['np','Số kho',1]]:[['p',Lb.p],has('n')&&['n',Lb.n],['m',Lb.m],['d',Lb.d]];
   if(lot)cols.push(['s',Lb.s]);cols.push(['u',Lb.u,0,1]);if(lot){if(has('x'))cols.push(['x',Lb.x]);cols.push(['b',Lb.b])}else cols.push(['lots','Số lô',1]);
-  cols.push(['q',Lb.q,1]);if(has('a0'))cols.push(['a0',Lb.a0,1]);cols.push(['h','Tồn có đơn hàng',1],['a','Khả dụng',1]);if(has('g'))cols.push(['g',Lb.g]);
+  cols.push(['q',Lb.q,1]);if(has('a0'))cols.push(['a0',Lb.a0,1]);cols.push(['h','Tồn có đơn hàng',1],['a',sum?'Khả dụng (tổng)':'Khả dụng',1]);if(sum)cols.push(['pd','Khả dụng từng kho',0,1]);if(has('g'))cols.push(['g',Lb.g]);
   const C=cols.filter(Boolean);
   let h='<table class="sap"><thead><tr>'+C.map(c=>c[3]?'<th>'+esc(c[1])+'</th>':thS(c[0],esc(c[1]),c[2])).join('')+'</tr></thead><tbody>';
   const cell=(x,f)=>{switch(f){
@@ -568,14 +593,16 @@ function renderStock(){
     case 'h':return '<td class="n held"'+(x.h?' title="Bấm để xem ai đang giữ"':'')+'>'+(x.h?fmtN(x.h):'')+'</td>';
     case 'a':return '<td class="n av '+avCls(x.a)+'">'+fmtN(x.a)+'</td>';
     case 'lots':return '<td class="n">'+x.lots+'</td>';
+    case 'np':return '<td class="n">'+x.np+'</td>';
+    case 'pd':return '<td class="pd">'+[...x.pd.entries()].sort((a,b)=>a[0].localeCompare(b[0])).map(([pl,a])=>'<span class="kq '+avCls(a)+'" title="'+esc(S.pName&&S.pName[pl]||'')+'">'+esc(pl)+' <b>'+fmtN(a)+'</b></span>').join('')+'</td>';
     default:return '<td>'+esc(x[f])+'</td>'}};
   for(const x of shown){
-    h+='<tr tabindex="0" class="click'+(x.h?' hasheld':'')+'" data-k="'+esc(x.k)+'" data-mode="'+(lot?'lot':'mat')+'">'+C.map(c=>cell(x,c[0])).join('')+'</tr>';
+    h+='<tr tabindex="0" class="click'+(x.h?' hasheld':'')+'" data-k="'+esc(x.k)+'" data-mode="'+V.mode+'">'+C.map(c=>cell(x,c[0])).join('')+'</tr>';
   }
   if(!shown.length)h+='<tr><td colspan="'+C.length+'" class="empty">Không có dòng nào khớp bộ lọc.</td></tr>';
   h+='</tbody></table>';
   // Bảng nằm trong khung cuộn: giữ vị trí cuộn khi tải thêm, về đầu khi đổi bộ lọc / sắp xếp.
-  const sig=[V.q,V.plant,V.sloc,V.onlyAvail,V.onlyHeld,V.mode,V.sort,V.dir].join('|');const keep=box.scrollTop;
+  const sig=[V.q,V.plants.join(','),V.sloc,V.onlyAvail,V.onlyHeld,V.mode,V.sort,V.dir].join('|');const keep=box.scrollTop;
   box.innerHTML=h;box.scrollTop=sig===S._stkSig?keep:0;S._stkSig=sig;S._stkTotal=rows.length;
   const nf=n=>n.toLocaleString('vi-VN');
   $('#stkCount').textContent=rows.length?('Đang hiện '+nf(shown.length)+' / '+nf(rows.length)+' dòng'+(rows.length>shown.length?' · cuộn xuống trong bảng để xem tiếp':'')):'';
@@ -595,13 +622,13 @@ function renderSnap(){
 function nameOf(id){return id?'· bởi '+id:''}
 
 /* ---------- hold dialog + cart ---------- */
-function heldList(k,mode){if(mode==='mat'){const sep=String.fromCharCode(1);const a=String(k).split(sep);return S.orders.filter(o=>o.m===a[0]&&o.p===a[1])}return (S.resv.get(k)||{list:[]}).list}
+function heldList(k,mode){if(mode==='sum'){const P=S.view.plants;return S.orders.filter(o=>o.m===k&&(!P.length||P.includes(o.p)))}if(mode==='mat'){const sep=String.fromCharCode(1);const a=String(k).split(sep);return S.orders.filter(o=>o.m===a[0]&&o.p===a[1])}return (S.resv.get(k)||{list:[]}).list}
 function showHeld(k,mode){const list=heldList(k,mode).slice().sort((a,b)=>String(b.createdAt).localeCompare(String(a.createdAt)));if(!list.length)return;
-  const o0=list[0];const mat=mode==='mat';const tot=r3(list.reduce((t,o)=>t+(+o.qty||0),0));
-  const ov=openModal('<div class="dh"><span>Ai đang giữ · '+esc(o0.m)+(mat?'':' · Lô '+esc(o0.b||'—'))+'</span><span class="muted small">'+esc(o0.p)+(o0.n?' '+esc(o0.n):'')+'</span></div><div class="db">'+
+  const o0=list[0];const mat=mode!=='lot',sm=mode==='sum';const tot=r3(list.reduce((t,o)=>t+(+o.qty||0),0));
+  const ov=openModal('<div class="dh"><span>Ai đang giữ · '+esc(o0.m)+(mat?'':' · Lô '+esc(o0.b||'—'))+'</span><span class="muted small">'+(sm?esc(plantLbl()):esc(o0.p)+(o0.n?' '+esc(o0.n):''))+'</span></div><div class="db">'+
     '<div class="small" style="margin-bottom:8px">'+esc(o0.d)+' — tổng đang giữ <b class="held">'+fmtN(tot)+' '+esc(o0.u)+'</b> ('+list.length+' dòng)</div>'+
-    '<div class="tw" style="max-height:380px"><table><thead><tr><th>Người giữ</th><th>KD</th><th>CH / khách</th><th>Số SAP</th>'+(mat?'<th>Lô</th>':'')+'<th class="n">SL</th><th>Ngày giữ</th><th>Ghi chú</th></tr></thead><tbody>'+
-    list.map(o=>'<tr><td><b>'+esc(o.createdBy)+'</b></td><td>'+(o.kd?esc(o.kd):'<span class="muted">—</span>')+'</td><td>'+esc(o.ch)+'</td><td>'+esc(o.so)+'</td>'+(mat?'<td>'+esc(o.b)+'</td>':'')+'<td class="n">'+fmtN(o.qty)+'</td><td>'+esc(fmtDT(o.createdAt))+'</td><td class="small">'+esc(o.note)+'</td></tr>').join('')+
+    '<div class="tw" style="max-height:380px"><table><thead><tr><th>Người giữ</th><th>KD</th><th>CH / khách</th><th>Số SAP</th>'+(mat?'<th>'+(sm?'Kho · Lô':'Lô')+'</th>':'')+'<th class="n">SL</th><th>Ngày giữ</th><th>Ghi chú</th></tr></thead><tbody>'+
+    list.map(o=>'<tr><td><b>'+esc(o.createdBy)+'</b></td><td>'+(o.kd?esc(o.kd):'<span class="muted">—</span>')+'</td><td>'+esc(o.ch)+'</td><td>'+esc(o.so)+'</td>'+(mat?'<td>'+esc((sm?o.p+' · ':'')+o.b)+'</td>':'')+'<td class="n">'+fmtN(o.qty)+'</td><td>'+esc(fmtDT(o.createdAt))+'</td><td class="small">'+esc(o.note)+'</td></tr>').join('')+
     '</tbody></table></div></div><div class="df"><button class="btn" data-x>Đóng</button></div>',true);
   ov.querySelector('[data-x]').onclick=()=>ov.remove()}
 function openHold(k){
@@ -786,7 +813,13 @@ function renderAll(){renderSnap();renderGlobal();if(S.tab==='stock')renderStock(
 /* ---------- events ---------- */
 document.getElementById('nav').addEventListener('click',e=>{const b=e.target.closest('button');if(b)switchTab(b.dataset.tab)});
 let qT=null;$('#q').addEventListener('input',e=>{clearTimeout(qT);qT=setTimeout(()=>{S.view.q=e.target.value;S.view.limit=200;renderStock()},150)});
-$('#fPlant').onchange=e=>{S.view.plant=e.target.value;S.view.limit=200;renderStock()};
+{const box=$('#fPlantBox'),btn=$('#fPlantBtn'),pop=$('#fPlantPop');
+  const open=o=>{pop.classList.toggle('hide',!o);btn.setAttribute('aria-expanded',o)};
+  btn.onclick=()=>open(pop.classList.contains('hide'));
+  pop.addEventListener('change',e=>{if(e.target.matches('input[type=checkbox]'))setPlants([...pop.querySelectorAll('input:checked')].map(i=>i.value))});
+  pop.addEventListener('click',e=>{if(e.target.closest('[data-all]'))setPlants(S.plants.slice());else if(e.target.closest('[data-none]'))setPlants([]);else if(e.target.closest('[data-done]')){open(false);btn.focus()}});
+  document.addEventListener('mousedown',e=>{if(!box.contains(e.target))open(false)});
+  box.addEventListener('keydown',e=>{if(e.key==='Escape'){open(false);btn.focus()}})}
 $('#fSloc').onchange=e=>{S.view.sloc=e.target.value;S.view.limit=200;renderStock()};
 $('#onlyAvail').onchange=e=>{S.view.onlyAvail=e.target.checked;renderStock()};
 $('#onlyHeld').onchange=e=>{S.view.onlyHeld=e.target.checked;renderStock()};
@@ -797,15 +830,15 @@ $('#more').onclick=()=>{S.view.limit+=300;renderStock()};
 $('#stockTable').addEventListener('click',e=>{const th=e.target.closest('th[data-sort]');if(th){const f=th.dataset.sort;if(S.view.sort===f)S.view.dir*=-1;else{S.view.sort=f;S.view.dir=['q','h','a','lots'].includes(f)?-1:1}renderStock();return}
   const tr=e.target.closest('tr[data-k]');if(!tr)return;
   const hc=e.target.closest('td.held');if(hc&&hc.textContent.trim()){showHeld(tr.dataset.k,tr.dataset.mode);return}
-  if(tr.dataset.mode==='mat'){const [m,p]=tr.dataset.k.split('\u0001');S.view.mode='lot';document.querySelectorAll('#mode button').forEach(x=>{const on=x.dataset.m==='lot';x.classList.toggle('on',on);x.setAttribute('aria-pressed',on)});
-    $('#q').value=m;S.view.q=m;if(p){$('#fPlant').value=p;S.view.plant=p}renderStock();return}
+  if(tr.dataset.mode!=='lot'){const [m,p]=tr.dataset.k.split('\u0001');S.view.mode='lot';document.querySelectorAll('#mode button').forEach(x=>{const on=x.dataset.m==='lot';x.classList.toggle('on',on);x.setAttribute('aria-pressed',on)});
+    $('#q').value=m;S.view.q=m;if(p)S.view.plants=[p];renderPlantPick();renderStock();return}
   openHold(tr.dataset.k)});
 $('#stockTable').addEventListener('keydown',e=>{if((e.key==='Enter'||e.key===' ')&&e.target.matches('tr[data-k]')){e.preventDefault();e.target.click()}});
 $('#copyStock').onclick=()=>{const lot=S.view.mode==='lot';const rows=currentRows();const Lb=L();
-  const f=['p'];if(has('n'))f.push('n');f.push('m','d');if(lot)f.push('s');f.push('u');if(lot){if(has('x'))f.push('x');f.push('b')}else f.push('lots');f.push('q');if(has('a0'))f.push('a0');f.push('h','a');if(has('g'))f.push('g');
-  const hd=f.map(k=>k==='lots'?'Số lô':k==='h'?'Tồn có đơn hàng':k==='a'?'Khả dụng':Lb[k]);
+  const sum=S.view.mode==='sum';const f=['p'];if(has('n')&&!sum)f.push('n');f.push('m','d');if(lot)f.push('s');f.push('u');if(lot){if(has('x'))f.push('x');f.push('b')}else f.push('lots');f.push('q');if(has('a0'))f.push('a0');f.push('h','a');if(sum)f.push('pd');if(has('g'))f.push('g');
+  const hd=f.map(k=>k==='pd'?'Khả dụng từng kho':k==='lots'?'Số lô':k==='h'?'Tồn có đơn hàng':k==='a'?'Khả dụng':Lb[k]);
   const num=v=>v==null?'':String(r3(v)).replace('.',',');
-  copyText([hd.join('\t')].concat(rows.map(x=>f.map(k=>['q','a0','h','a'].includes(k)?num(x[k]):clean(x[k])).join('\t'))).join('\n'))};
+  copyText([hd.join('\t')].concat(rows.map(x=>f.map(k=>k==='pd'?[...x.pd.entries()].map(([pl,a])=>pl+': '+num(a)).join(' | '):['q','a0','h','a'].includes(k)?num(x[k]):clean(x[k])).join('\t'))).join('\n'))};
 $('#cartOpen').onclick=openCart;
 $('#cartClear').onclick=async()=>{if(await confirmBox('Bỏ đơn đang soạn','Bỏ '+S.cart.length+' dòng chưa lưu?','Bỏ',true)){S.cart=[];renderCart();renderStock()}};
 $('#orderList').addEventListener('click',onOrdersClick);$('#reconcile').addEventListener('click',onOrdersClick);
